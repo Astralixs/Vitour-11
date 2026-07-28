@@ -40,9 +40,12 @@ export default function HomePage() {
   const facilitiesReveal = useReveal();
   const facility1 = useReveal();
   const facility2 = useReveal();
+  const facility3 = useReveal();
+  const facility4 = useReveal();
   const locationReveal = useReveal();
   const locationInfo = useReveal();
   const locationMap = useReveal();
+  const [showDenah, setShowDenah] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/api/locations`)
@@ -221,7 +224,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Facilities Section */}
+            {/* Facilities Section */}
       <section className="py-12 md:py-20 px-4 md:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div ref={facilitiesReveal.ref} className={fadeUp(facilitiesReveal.visible)}>
@@ -229,6 +232,8 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+            
+            {/* Card 1 - Gedung Modern */}
             <div ref={facility1.ref} className={`img-zoom overflow-hidden rounded-lg shadow-lg card-hover ${fadeUp(facility1.visible, 0)}`}>
               <img
                 src="/IMG_0157.jpeg"
@@ -243,6 +248,7 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* Card 2 - Ruang Kelas */}
             <div ref={facility2.ref} className={`img-zoom overflow-hidden rounded-lg shadow-lg card-hover ${fadeUp(facility2.visible, 150)}`}>
               <img
                 src="/kelasking.jpeg"
@@ -256,6 +262,81 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
+
+            {/* Card 3 - Video */}
+            <div ref={facility3.ref} className={`img-zoom overflow-hidden rounded-lg shadow-lg card-hover ${fadeUp(facility3.visible, 300)}`}>
+              <div className="w-full h-48 md:h-64">
+                <iframe
+                  src="https://www.youtube.com/embed/ONWUEFy4wjE"
+                  title="Video Fasilitas"
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+              <div className="p-4 md:p-6 bg-gray-50">
+                <h3 className="text-lg md:text-xl font-bold text-[#3f51b5] mb-2">Profil Sekolah</h3>
+              </div>
+            </div>
+
+            {/* Card 4 - Denah */}
+           {/* Modal Fullscreen */}
+            {showDenah && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+                onClick={() => setShowDenah(false)}
+              >
+                <div
+                  className="relative w-full max-w-5xl mx-4 my-4 flex flex-col"
+                  style={{ height: '90vh' }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <iframe
+                    src="https://denah-sekolah.tiiny.site/"
+                    title="Denah Sekolah Fullscreen"
+                    className="w-full flex-1 rounded-t-lg border-0"
+                  />
+                  <div className="bg-white rounded-b-lg px-4 py-3 flex justify-center">
+                    <button
+                      onClick={() => setShowDenah(false)}
+                      className="text-sm text-[#3f51b5] border border-[#3f51b5] px-6 py-2 rounded-full hover:bg-[#3f51b5] hover:text-white transition"
+                    >
+                      ✕ Tutup
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Card facility4 */}
+            <div ref={facility4.ref} className={`img-zoom overflow-hidden rounded-lg shadow-lg card-hover ${fadeUp(facility4.visible, 450)}`}>
+              <div
+                className="w-full h-48 md:h-64 relative cursor-pointer group"
+                onClick={() => setShowDenah(true)}
+              >
+                <iframe
+                  src="https://denah-sekolah.tiiny.site/"
+                  title="Denah Sekolah"
+                  className="w-full h-full border-0 pointer-events-none"
+                />
+                {/* Overlay klik */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 transition text-white text-sm bg-black/50 px-4 py-2 rounded-full">
+                    🔍 Perbesar
+                  </span>
+                </div>
+              </div>
+              <div className="p-4 md:p-6 bg-gray-50 flex items-center justify-between">
+                <h3 className="text-lg md:text-xl font-bold text-[#3f51b5]">PDF Denah Sekolah</h3>
+                <button
+                  onClick={() => setShowDenah(true)}
+                  className="text-sm text-[#3f51b5] border border-[#3f51b5] px-3 py-1 rounded-full hover:bg-[#3f51b5] hover:text-white transition"
+                >
+                  Lihat Penuh
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
