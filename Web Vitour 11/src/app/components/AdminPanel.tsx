@@ -66,6 +66,38 @@ export default function AdminPanel() {
     setSession(null);
   };
 
+  // ── LIVE SESSION CHECK: detect if this user's account was deleted/disabled server-side ──
+  // getSession() only reads the locally cached token and won't notice a deleted account
+  // until it naturally expires. getUser() actually validates against Supabase's servers.
+  useEffect(() => {
+    if (!session) return;
+
+    const validateSession = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data?.user) {
+        console.warn('[validateSession] Account no longer valid, logging out.', error);
+        await supabase.auth.signOut();
+        setSession(null);
+        showToast('Your session has ended — account no longer exists or was signed out.', 'error');
+      }
+    };
+
+    // Check immediately, then poll every 30 seconds
+    validateSession();
+    const intervalId = setInterval(validateSession, 30000);
+
+    // Also re-check whenever the tab regains focus / becomes visible
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') validateSession();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [session]);
+
   useEffect(() => {
     if (!session) return;
     console.log('[fetchLocations] BASE_URL:', BASE_URL);
