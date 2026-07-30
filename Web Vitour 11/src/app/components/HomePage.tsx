@@ -76,8 +76,8 @@ export default function HomePage() {
   }, []);
 
   const fadeUp = (visible: boolean, delay = 0) =>
-    `transition-all duration-700 ease-out ${delay ? `delay-[${delay}ms]` : ''} ${
-      visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+    `transition-all duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${delay ? `delay-[${delay}ms]` : ''} ${
+      visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
     }`;
 
   return (
@@ -95,11 +95,11 @@ export default function HomePage() {
           from { opacity: 0; }
           to   { opacity: 1; }
         }
-        .hero-title  { animation: fadeSlideUp 0.9s ease-out 0.2s both; }
-        .hero-sub    { animation: fadeSlideUp 0.9s ease-out 0.45s both; }
-        .hero-btn    { animation: fadeSlideUp 0.9s ease-out 0.7s both; }
-        .hero-overlay { animation: fadeIn 1.2s ease-out 0s both; }
-        .nav-anim    { animation: fadeSlideDown 0.6s ease-out 0s both; }
+        .hero-title  { animation: fadeSlideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+        .hero-sub    { animation: fadeSlideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.65s both; }
+        .hero-btn    { animation: fadeSlideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 1s both; }
+        .hero-overlay { animation: fadeIn 1.8s ease-out 0s both; }
+        .nav-anim    { animation: fadeSlideDown 1s cubic-bezier(0.16, 1, 0.3, 1) 0s both; }
         .card-hover  {
           transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
@@ -111,8 +111,8 @@ export default function HomePage() {
 
       {/* Navigation Header (kept from original, now transparent/overlaying) */}
       <nav
-        className={`nav-anim fixed top-0 left-0 w-full z-50 text-white px-4 md:px-8 py-3 md:py-4 transition-colors duration-300 ${
-          scrolled ? 'bg-black/30 backdrop-blur-md shadow-md' : 'bg-transparent'
+        className={`nav-anim fixed top-0 left-0 w-full z-50 text-white px-4 md:px-8 py-3 md:py-4 transition-all duration-700 ease-in-out ${
+          scrolled ? 'bg-black/30 backdrop-blur-md shadow-md' : 'bg-transparent backdrop-blur-0 shadow-none'
         }`}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -188,7 +188,7 @@ export default function HomePage() {
 
           <div
             ref={aboutImage.ref}
-            className={`img-zoom relative rounded-xl overflow-hidden aspect-video shadow-lg border border-[#c2c6d5] bg-white card-hover ${fadeUp(aboutImage.visible, 150)}`}
+            className={`img-zoom relative rounded-xl overflow-hidden aspect-video shadow-lg border border-[#c2c6d5] bg-white card-hover ${fadeUp(aboutImage.visible, 250)}`}
           >
             <img
               className="w-full h-full object-cover"
@@ -218,7 +218,9 @@ export default function HomePage() {
             </div>
           </div>
           <button className="bg-white text-[#0667d3] px-6 md:px-8 py-3 rounded-lg font-medium text-sm md:text-base hover:bg-[#f0f3ff] transition-colors shadow-sm w-full sm:w-auto">
-            Lihat Sertifikasi
+            <a href="https://referensi.data.kemendikdasmen.go.id/snpmb/site/sekolah?npsn=20219175" target="_blank" rel="noopener noreferrer">
+              Lihat Sertifikasi
+            </a>
           </button>
         </div>
       </section>
@@ -281,7 +283,7 @@ export default function HomePage() {
             {/* Right Column: Live Map (kept from original) */}
             <div
               ref={locationMap.ref}
-              className={`md:col-span-7 h-[300px] md:h-full min-h-[350px] md:min-h-[400px] rounded-xl overflow-hidden border border-[#c2c6d5] shadow-lg ${fadeUp(locationMap.visible, 150)}`}
+              className={`md:col-span-7 h-[300px] md:h-full min-h-[350px] md:min-h-[400px] rounded-xl overflow-hidden border border-[#c2c6d5] shadow-lg ${fadeUp(locationMap.visible, 250)}`}
             >
               <iframe
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3961.00062464909!2d107.55575517427145!3d-6.890527093108526!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e68e6bd6aaaaaab%3A0xf843088e2b5bf838!2sSMK%20Negeri%2011%20Bandung!5e0!3m2!1sen!2sid!4v1775716742394!5m2!1sen!2sid"
