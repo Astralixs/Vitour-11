@@ -123,7 +123,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           </button>
         </form>
 
-        <div className="login-footer">RESTRICTED ACCESS — ADMINS ONLY</div>
+        <div className="login-footer">ENTER DESIGNATED PASSWORDS AND EMAIL</div>
       </div>
     </div>
   );

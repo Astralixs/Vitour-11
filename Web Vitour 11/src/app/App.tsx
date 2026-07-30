@@ -9,7 +9,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/tour" element={<TourPage />} />
-        <Route path="/singisfsdipfjapfjpajfop" element={<AdminPanel />} />  {/* ← moved inside */}
+        <Route path="/admin" element={<AdminPanel />} />  {/* ← moved inside */}
       </Routes>
     </BrowserRouter>
   );
