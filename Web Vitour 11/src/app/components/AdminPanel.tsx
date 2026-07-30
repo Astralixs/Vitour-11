@@ -68,14 +68,22 @@ export default function AdminPanel() {
 
   useEffect(() => {
     if (!session) return;
+    console.log('[fetchLocations] BASE_URL:', BASE_URL);
     fetch(`${BASE_URL}/api/locations`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Locations fetch failed: ${res.status} ${res.statusText}`);
+        return res.json();
+      })
       .then(data => {
         if (data.length > 0) {
           setLocationId(data[0].id);
         } else {
           showToast('No location found in database!', 'error');
         }
+      })
+      .catch(err => {
+        console.error('[fetchLocations] FULL ERROR:', err);
+        showToast(`Failed to fetch locations: ${err.message}`, 'error');
       });
   }, [session]);
 
@@ -101,22 +109,34 @@ export default function AdminPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'My Tour', description: 'My first tour location' }),
       });
+      if (!res.ok) throw new Error(`Create location failed: ${res.status} ${res.statusText}`);
       const loc = await res.json();
       setLocationId(loc.id);
       showToast('Location created!');
-    } catch { showToast('Failed to create location', 'error'); }
+    } catch (err: any) {
+      console.error('[createDefaultLocation] FULL ERROR:', err);
+      showToast(`Failed to create location: ${err.message}`, 'error');
+    }
   };
 
   const fetchPanoramas = async (id: number) => {
-    try { setPanoramas(await getPanoramas(id)); }
-    catch { showToast('Failed to fetch panoramas', 'error'); }
+    try {
+      setPanoramas(await getPanoramas(id));
+    } catch (err: any) {
+      console.error('[fetchPanoramas] FULL ERROR:', err);
+      showToast(`Failed to fetch panoramas: ${err.message}`, 'error');
+    }
   };
 
   const fetchHotspots = async (panorama_id: number) => {
     try {
       const res = await fetch(`${BASE_URL}/api/hotspots?panorama_id=${panorama_id}`);
+      if (!res.ok) throw new Error(`Hotspots fetch failed: ${res.status} ${res.statusText}`);
       setHotspots(await res.json());
-    } catch { showToast('Failed to fetch hotspots', 'error'); }
+    } catch (err: any) {
+      console.error('[fetchHotspots] FULL ERROR:', err);
+      showToast(`Failed to fetch hotspots: ${err.message}`, 'error');
+    }
   };
 
   const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -136,54 +156,139 @@ export default function AdminPanel() {
     try {
       const fileExt = imageFile.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+      console.log('[handleAddPanorama] uploading to storage...', fileName);
       const { error: uploadError } = await supabase.storage
         .from('panoramas')
         .upload(fileName, imageFile, { contentType: imageFile.type });
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('[handleAddPanorama] storage upload error:', uploadError);
+        throw new Error(`Storage upload failed: ${uploadError.message}`);
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('panoramas')
         .getPublicUrl(fileName);
+      console.log('[handleAddPanorama] got publicUrl:', publicUrl);
 
+      console.log('[handleAddPanorama] calling createPanorama, BASE_URL =', BASE_URL);
       await createPanorama({
         location_id: locationId,
         title: panoramaTitle,
         image_url: publicUrl,
       });
+
       setPanoramaTitle(''); setImageFile(null);
-      fetchPanoramas(locationId); showToast('Panorama uploaded!');
-    } catch { showToast('Failed to upload panorama', 'error'); }
+      fetchPanoramas(locationId);
+      showToast('Panorama uploaded!');
+    } catch (err: any) {
+      console.error('[handleAddPanorama] FULL ERROR:', err);
+      showToast(`Failed to upload panorama: ${err.message || err}`, 'error');
+    }
     setLoading(false);
   };
 
   const handleDeletePanorama = async (id: number) => {
     try {
+      const panoToDelete = panoramas.find((p: any) => p.id === id);
+
+      // 1) Delete the image file from Supabase Storage
+      if (panoToDelete?.image_url) {
+        try {
+          // Extract the storage file path from the public URL
+          // e.g. https://<project>.supabase.co/storage/v1/object/public/panoramas/169999-abc.jpg
+          const marker = '/panoramas/';
+          const idx = panoToDelete.image_url.indexOf(marker);
+          if (idx !== -1) {
+            const filePath = panoToDelete.image_url.substring(idx + marker.length);
+            console.log('[handleDeletePanorama] removing storage file:', filePath);
+            const { error: storageError } = await supabase.storage
+              .from('panoramas')
+              .remove([filePath]);
+            if (storageError) {
+              console.error('[handleDeletePanorama] storage remove error:', storageError);
+              // Don't throw here — still proceed to delete DB records even if the file is already gone
+            }
+          } else {
+            console.warn('[handleDeletePanorama] could not parse file path from image_url:', panoToDelete.image_url);
+          }
+        } catch (storageErr) {
+          console.error('[handleDeletePanorama] storage cleanup failed:', storageErr);
+        }
+      }
+
+      // 2) Delete this panorama's own hotspots
+      try {
+        const res = await fetch(`${BASE_URL}/api/hotspots?panorama_id=${id}`);
+        if (res.ok) {
+          const ownHotspots = await res.json();
+          for (const hs of ownHotspots) {
+            const delRes = await fetch(`${BASE_URL}/api/hotspots/${hs.id}`, { method: 'DELETE' });
+            if (!delRes.ok) console.error(`[handleDeletePanorama] failed deleting own hotspot ${hs.id}: ${delRes.status}`);
+          }
+          console.log(`[handleDeletePanorama] removed ${ownHotspots.length} own hotspot(s) for panorama ${id}`);
+        } else {
+          console.error('[handleDeletePanorama] failed fetching own hotspots:', res.status);
+        }
+      } catch (hsErr) {
+        console.error('[handleDeletePanorama] own hotspot cleanup failed:', hsErr);
+      }
+
+      // 3) Delete any hotspots on OTHER panoramas that target this one (avoid dangling links)
+      try {
+        const otherPanoramas = panoramas.filter((p: any) => p.id !== id);
+        for (const pan of otherPanoramas) {
+          const res = await fetch(`${BASE_URL}/api/hotspots?panorama_id=${pan.id}`);
+          if (!res.ok) continue;
+          const hsList = await res.json();
+          const targeting = hsList.filter((hs: any) => hs.target_panorama_id === id);
+          for (const hs of targeting) {
+            const delRes = await fetch(`${BASE_URL}/api/hotspots/${hs.id}`, { method: 'DELETE' });
+            if (!delRes.ok) console.error(`[handleDeletePanorama] failed deleting linking hotspot ${hs.id}: ${delRes.status}`);
+          }
+          if (targeting.length > 0) {
+            console.log(`[handleDeletePanorama] removed ${targeting.length} linking hotspot(s) from panorama ${pan.id}`);
+          }
+        }
+      } catch (linkErr) {
+        console.error('[handleDeletePanorama] linking hotspot cleanup failed:', linkErr);
+      }
+
+      // 4) Finally, delete the panorama record itself
       await deletePanorama(id);
+
       if (selectedPanorama?.id === id) { setSelectedPanorama(null); setHotspots([]); }
       if (locationId) fetchPanoramas(locationId);
-      showToast('Panorama deleted!');
-    } catch { showToast('Failed to delete panorama', 'error'); }
+      showToast('Panorama, image, and related hotspots deleted!');
+    } catch (err: any) {
+      console.error('[handleDeletePanorama] FULL ERROR:', err);
+      showToast(`Failed to delete panorama: ${err.message}`, 'error');
+    }
   };
 
   const handleSetFirstScene = async (id: number) => {
     try {
       for (const pan of panoramas) {
-        await fetch(`${BASE_URL}/api/panoramas/${pan.id}`, {
+        const res = await fetch(`${BASE_URL}/api/panoramas/${pan.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...pan, is_first_scene: pan.id === id }),
         });
+        if (!res.ok) throw new Error(`Update failed for panorama ${pan.id}: ${res.status} ${res.statusText}`);
       }
       if (locationId) fetchPanoramas(locationId);
       showToast('First scene updated!');
-    } catch { showToast('Failed to set first scene', 'error'); }
+    } catch (err: any) {
+      console.error('[handleSetFirstScene] FULL ERROR:', err);
+      showToast(`Failed to set first scene: ${err.message}`, 'error');
+    }
   };
 
   const handleAddHotspot = async () => {
     if (!selectedPanorama || !hsPitch || !hsYaw) return;
     setLoading(true);
     try {
-      await fetch(`${BASE_URL}/api/hotspots`, {
+      const res = await fetch(`${BASE_URL}/api/hotspots`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -195,19 +300,28 @@ export default function AdminPanel() {
           target_panorama_id: hsType === 'scene' && hsTargetId ? Number(hsTargetId) : null,
         })
       });
+      if (!res.ok) throw new Error(`Add hotspot failed: ${res.status} ${res.statusText}`);
       setHsPitch(''); setHsYaw(''); setHsText(''); setHsTargetId('');
       setClickMarker(null);
-      fetchHotspots(selectedPanorama.id); showToast('Hotspot added!');
-    } catch { showToast('Failed to add hotspot', 'error'); }
+      fetchHotspots(selectedPanorama.id);
+      showToast('Hotspot added!');
+    } catch (err: any) {
+      console.error('[handleAddHotspot] FULL ERROR:', err);
+      showToast(`Failed to add hotspot: ${err.message}`, 'error');
+    }
     setLoading(false);
   };
 
   const handleDeleteHotspot = async (id: number) => {
     try {
-      await fetch(`${BASE_URL}/api/hotspots/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${BASE_URL}/api/hotspots/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`Delete hotspot failed: ${res.status} ${res.statusText}`);
       if (selectedPanorama) fetchHotspots(selectedPanorama.id);
       showToast('Hotspot deleted!');
-    } catch { showToast('Failed to delete hotspot', 'error'); }
+    } catch (err: any) {
+      console.error('[handleDeleteHotspot] FULL ERROR:', err);
+      showToast(`Failed to delete hotspot: ${err.message}`, 'error');
+    }
   };
 
   // ── AUTH GATES ──
