@@ -46,6 +46,7 @@ export default function AdminPanel() {
 
   const imageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastCheckRef = useRef<number>(0);
 
   // ── AUTH: check session on mount + listen for changes ──
   useEffect(() => {
@@ -69,26 +70,26 @@ export default function AdminPanel() {
   // ── LIVE SESSION CHECK: detect if this user's account was deleted/disabled server-side ──
   // getSession() only reads the locally cached token and won't notice a deleted account
   // until it naturally expires. getUser() actually validates against Supabase's servers.
+  const validateSession = async (source: string = 'interval') => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user) {
+      console.warn(`[validateSession:${source}] Account no longer valid, logging out.`, error);
+      await supabase.auth.signOut();
+      setSession(null);
+      showToast('Your session has ended — account no longer exists or was signed out.', 'error');
+    }
+  };
+
   useEffect(() => {
     if (!session) return;
 
-    const validateSession = async () => {
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data?.user) {
-        console.warn('[validateSession] Account no longer valid, logging out.', error);
-        await supabase.auth.signOut();
-        setSession(null);
-        showToast('Your session has ended — account no longer exists or was signed out.', 'error');
-      }
-    };
-
     // Check immediately, then poll every 30 seconds
-    validateSession();
-    const intervalId = setInterval(validateSession, 30000);
+    validateSession('interval');
+    const intervalId = setInterval(() => validateSession('interval'), 30000);
 
     // Also re-check whenever the tab regains focus / becomes visible
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') validateSession();
+      if (document.visibilityState === 'visible') validateSession('visibility');
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
@@ -97,6 +98,16 @@ export default function AdminPanel() {
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [session]);
+
+  // Runs a (throttled) session check on every click inside the admin panel,
+  // so a deleted/invalidated account gets caught as soon as the user tries to do anything.
+  const handleAdminPanelClick = () => {
+    if (!session) return;
+    const now = Date.now();
+    if (now - lastCheckRef.current < 3000) return; // throttle: skip if checked <3s ago
+    lastCheckRef.current = now;
+    validateSession('click');
+  };
 
   useEffect(() => {
     if (!session) return;
@@ -374,7 +385,7 @@ export default function AdminPanel() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#e8e6e0', fontFamily: "'DM Mono', 'Courier New', monospace" }}>
+    <div onClick={handleAdminPanelClick} style={{ minHeight: '100vh', background: '#0a0a0f', color: '#e8e6e0', fontFamily: "'DM Mono', 'Courier New', monospace" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Playfair+Display:wght@700;900&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
