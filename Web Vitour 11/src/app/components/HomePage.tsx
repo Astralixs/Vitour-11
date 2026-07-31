@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { MapPin, Phone, ShieldCheck, Compass, Clock } from 'lucide-react';
+import { MapPin, Phone, ShieldCheck, Compass, Clock, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import { useState, useEffect, useRef } from 'react';
 
@@ -143,14 +143,23 @@ export default function HomePage() {
             <p className="hero-sub text-base sm:text-lg md:text-xl opacity-90 mb-6 md:mb-8">
               Membangun generasi unggul yang siap kerja, mandiri, dan berkarakter mulia melalui pendidikan vokasi berkualitas internasional.
             </p>
-            <div className="hero-btn">
+            <div className="hero-btn flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Link to={locationId ? `/tour?location_id=${locationId}` : '/tour'}>
                 <Button
-                  size="lg"
-                  className="flex items-center gap-2 bg-[#0667d3] text-white hover:bg-[#004fa7] rounded-full text-base md:text-lg px-6 md:px-10 py-4 md:py-6 h-auto transition-transform duration-200 hover:scale-105 active:scale-95 w-full sm:w-auto"
+                  size="default"
+                  className="flex items-center gap-2 bg-[#0667d3] text-white hover:bg-[#004fa7] rounded-md text-sm md:text-base px-5 md:px-6 py-2.5 md:py-3 h-auto transition-transform duration-200 hover:scale-105 active:scale-95 w-full sm:w-auto"
                 >
-                  <Compass size={20} />
+                  <Compass size={18} />
                   Mulai Tour Virtual
+                </Button>
+              </Link>
+              <Link to="/Details">
+                <Button
+                  size="default"
+                  className="flex items-center gap-2 bg-[#0667d3] text-white hover:bg-[#004fa7] rounded-md text-sm md:text-base px-5 md:px-6 py-2.5 md:py-3 h-auto transition-transform duration-200 hover:scale-105 active:scale-95 w-full sm:w-auto"
+                >
+                  <Search size={18} />
+                  Detail Ruangan
                 </Button>
               </Link>
             </div>
@@ -192,7 +201,7 @@ export default function HomePage() {
           >
             <img
               className="w-full h-full object-cover"
-              src="/kelasking.jpeg"
+              src="/IMG_0157.jpeg"
               alt="Siswa SMKN 11 Bandung belajar di ruang kelas modern"
             />
           </div>
@@ -218,7 +227,7 @@ export default function HomePage() {
             </div>
           </div>
           <button className="bg-white text-[#0667d3] px-6 md:px-8 py-3 rounded-lg font-medium text-sm md:text-base hover:bg-[#f0f3ff] transition-colors shadow-sm w-full sm:w-auto">
-            <a href="https://referensi.data.kemendikdasmen.go.id/snpmb/site/sekolah?npsn=20219175" target="_blank" rel="noopener noreferrer">
+           <a href="https://referensi.data.kemendikdasmen.go.id/snpmb/site/sekolah?npsn=20219175" target="_blank" rel="noopener noreferrer">
               Lihat Sertifikasi
             </a>
           </button>
