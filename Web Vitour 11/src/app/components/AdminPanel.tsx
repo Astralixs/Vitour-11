@@ -1197,7 +1197,7 @@ export default function AdminPanel() {
                   {editingPinId && <span className="editing-badge">EDITING</span>}
                 </div>
                 <div className="click-image-wrapper" ref={mapImageRef} onClick={handleMapClick}>
-                  <img src="/denah-sekolah.jpg" alt="Denah SMK Negeri 11 Bandung" draggable={false}
+                  <img src="/Denah.jpeg" alt="Denah SMK Negeri 11 Bandung" draggable={false}
                     onError={(e: any) => { e.target.style.display = 'none'; }} />
                   {!pinMarker && <div className="crosshair-label">Tap to place area</div>}
 
