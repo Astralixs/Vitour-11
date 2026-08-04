@@ -767,9 +767,18 @@ export default function AdminPanel() {
         <main className="content">
           {/* Stats */}
           <div className="stats-row">
-            <div className="stat-card"><div className="stat-num">{panoramas.length}</div><div className="stat-label">Panoramas</div></div>
-            <div className="stat-card"><div className="stat-num">{hotspots.length}</div><div className="stat-label">Hotspots</div></div>
-            <div className="stat-card"><div className="stat-num">{panoramas.filter((p: any) => p.is_first_scene).length > 0 ? '✓' : '—'}</div><div className="stat-label">First Scene</div></div>
+            {activeTab === 'details' ? (
+              <div className="stat-card" style={{ gridColumn: '1 / -1' }}>
+                <div className="stat-num">{rooms.length}</div>
+                <div className="stat-label">Total Room Details</div>
+              </div>
+            ) : (
+              <>
+                <div className="stat-card"><div className="stat-num">{panoramas.length}</div><div className="stat-label">Panoramas</div></div>
+                <div className="stat-card"><div className="stat-num">{hotspots.length}</div><div className="stat-label">Hotspots</div></div>
+                <div className="stat-card"><div className="stat-num">{panoramas.filter((p: any) => p.is_first_scene).length > 0 ? '✓' : '—'}</div><div className="stat-label">First Scene</div></div>
+              </>
+            )}
           </div>
 
           {!locationId && (
