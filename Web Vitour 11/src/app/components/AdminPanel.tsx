@@ -52,10 +52,20 @@ export default function AdminPanel() {
   const [roomCapacity, setRoomCapacity] = useState('');
   const [roomImageFile, setRoomImageFile] = useState<File | null>(null);
   const [roomLoading, setRoomLoading] = useState(false);
+  const [editingRoomId, setEditingRoomId] = useState<number | null>(null);
+
+  // ── DENAH / MAP PIN STATE (clickable areas on the school map) ──
+  const [pins, setPins] = useState<any[]>([]);
+  const [pinLabel, setPinLabel] = useState('');
+  const [pinRoomId, setPinRoomId] = useState('');
+  const [pinMarker, setPinMarker] = useState<{ x: number; y: number } | null>(null);
+  const [pinLoading, setPinLoading] = useState(false);
+  const [editingPinId, setEditingPinId] = useState<number | null>(null);
 
   const imageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const roomFileInputRef = useRef<HTMLInputElement>(null);
+  const mapImageRef = useRef<HTMLDivElement>(null);
   const lastCheckRef = useRef<number>(0);
 
   // ── AUTH: check session on mount + listen for changes ──
@@ -78,8 +88,6 @@ export default function AdminPanel() {
   };
 
   // ── LIVE SESSION CHECK: detect if this user's account was deleted/disabled server-side ──
-  // getSession() only reads the locally cached token and won't notice a deleted account
-  // until it naturally expires. getUser() actually validates against Supabase's servers.
   const validateSession = async (source: string = 'interval') => {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data?.user) {
@@ -93,11 +101,9 @@ export default function AdminPanel() {
   useEffect(() => {
     if (!session) return;
 
-    // Check immediately, then poll every 30 seconds
     validateSession('interval');
     const intervalId = setInterval(() => validateSession('interval'), 30000);
 
-    // Also re-check whenever the tab regains focus / becomes visible
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') validateSession('visibility');
     };
@@ -109,12 +115,10 @@ export default function AdminPanel() {
     };
   }, [session]);
 
-  // Runs a (throttled) session check on every click inside the admin panel,
-  // so a deleted/invalidated account gets caught as soon as the user tries to do anything.
   const handleAdminPanelClick = () => {
     if (!session) return;
     const now = Date.now();
-    if (now - lastCheckRef.current < 3000) return; // throttle: skip if checked <3s ago
+    if (now - lastCheckRef.current < 3000) return;
     lastCheckRef.current = now;
     validateSession('click');
   };
@@ -150,8 +154,13 @@ export default function AdminPanel() {
     }
   }, [selectedPanorama]);
 
-  // Load room details once logged in
-  useEffect(() => { if (session) fetchRooms(); }, [session]);
+  // Load room details + denah pins once logged in
+  useEffect(() => {
+    if (session) {
+      fetchRooms();
+      fetchPins();
+    }
+  }, [session]);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -195,7 +204,7 @@ export default function AdminPanel() {
     }
   };
 
-  // ── ROOM DETAILS: fetch / add / delete ──
+  // ── ROOM DETAILS: fetch / add / edit / delete ──
   const fetchRooms = async () => {
     try {
       const { data, error } = await supabase
@@ -210,38 +219,71 @@ export default function AdminPanel() {
     }
   };
 
-  const handleAddRoom = async () => {
-    if (!roomImageFile) { showToast('Please select a photo', 'error'); return; }
+  const resetRoomForm = () => {
+    setEditingRoomId(null);
+    setRoomName('');
+    setRoomDescription('');
+    setRoomLocation('');
+    setRoomCapacity('');
+    setRoomImageFile(null);
+  };
+
+  const handleEditRoomClick = (room: any) => {
+    setEditingRoomId(room.id);
+    setRoomName(room.name || '');
+    setRoomDescription(room.description || '');
+    setRoomLocation(room.location || '');
+    setRoomCapacity(room.capacity ? String(room.capacity) : '');
+    setRoomImageFile(null); // leave empty = keep existing photo unless admin picks a new one
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handles BOTH creating a new room and saving edits to an existing one.
+  const handleSaveRoom = async () => {
     if (!roomName.trim()) { showToast('Please enter a room name', 'error'); return; }
+    if (!editingRoomId && !roomImageFile) { showToast('Please select a photo', 'error'); return; }
+
     setRoomLoading(true);
     try {
-      const fileExt = roomImageFile.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+      let imageUrl: string | undefined;
 
-      const { error: uploadError } = await supabase.storage
-        .from('room-images')
-        .upload(fileName, roomImageFile, { contentType: roomImageFile.type });
-      if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
+      if (roomImageFile) {
+        const fileExt = roomImageFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('room-images')
+          .upload(fileName, roomImageFile, { contentType: roomImageFile.type });
+        if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('room-images')
-        .getPublicUrl(fileName);
+        const { data: { publicUrl } } = supabase.storage
+          .from('room-images')
+          .getPublicUrl(fileName);
+        imageUrl = publicUrl;
+      }
 
-      const { error: insertError } = await supabase.from('rooms').insert({
+      const payload: any = {
         name: roomName,
         description: roomDescription,
-        image_url: publicUrl,
         location: roomLocation || null,
         capacity: roomCapacity ? Number(roomCapacity) : null,
-      });
-      if (insertError) throw new Error(insertError.message);
+      };
+      if (imageUrl) payload.image_url = imageUrl;
 
-      setRoomName(''); setRoomDescription(''); setRoomLocation(''); setRoomCapacity(''); setRoomImageFile(null);
+      if (editingRoomId) {
+        const { error: updateError } = await supabase.from('rooms').update(payload).eq('id', editingRoomId);
+        if (updateError) throw new Error(updateError.message);
+        showToast('Room detail updated!');
+      } else {
+        const { error: insertError } = await supabase.from('rooms').insert(payload);
+        if (insertError) throw new Error(insertError.message);
+        showToast('Room detail added!');
+      }
+
+      resetRoomForm();
       fetchRooms();
-      showToast('Room detail added!');
     } catch (err: any) {
-      console.error('[handleAddRoom] FULL ERROR:', err);
-      showToast(`Failed to add room: ${err.message || err}`, 'error');
+      console.error('[handleSaveRoom] FULL ERROR:', err);
+      showToast(`Failed to save room: ${err.message || err}`, 'error');
     }
     setRoomLoading(false);
   };
@@ -263,11 +305,93 @@ export default function AdminPanel() {
       const { error } = await supabase.from('rooms').delete().eq('id', id);
       if (error) throw error;
 
+      if (editingRoomId === id) resetRoomForm();
       fetchRooms();
       showToast('Room detail deleted!');
     } catch (err: any) {
       console.error('[handleDeleteRoom] FULL ERROR:', err);
       showToast(`Failed to delete room: ${err.message}`, 'error');
+    }
+  };
+
+  // ── DENAH PINS: fetch / add / edit / delete ──
+  const fetchPins = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('room_pins')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setPins(data || []);
+    } catch (err: any) {
+      console.error('[fetchPins] FULL ERROR:', err);
+      showToast(`Failed to fetch map pins: ${err.message}`, 'error');
+    }
+  };
+
+  const resetPinForm = () => {
+    setEditingPinId(null);
+    setPinLabel('');
+    setPinRoomId('');
+    setPinMarker(null);
+  };
+
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setPinMarker({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
+  };
+
+  const handleEditPinClick = (pin: any) => {
+    setEditingPinId(pin.id);
+    setPinLabel(pin.label || '');
+    setPinRoomId(pin.room_id ? String(pin.room_id) : '');
+    setPinMarker({ x: pin.map_x, y: pin.map_y });
+  };
+
+  const handleSavePin = async () => {
+    if (!pinMarker) { showToast('Tap posisi di denah dulu', 'error'); return; }
+    if (!pinLabel.trim()) { showToast('Isi label/nama area', 'error'); return; }
+
+    setPinLoading(true);
+    try {
+      const payload = {
+        label: pinLabel,
+        map_x: pinMarker.x,
+        map_y: pinMarker.y,
+        room_id: pinRoomId ? Number(pinRoomId) : null,
+      };
+
+      if (editingPinId) {
+        const { error } = await supabase.from('room_pins').update(payload).eq('id', editingPinId);
+        if (error) throw error;
+        showToast('Area diperbarui!');
+      } else {
+        const { error } = await supabase.from('room_pins').insert(payload);
+        if (error) throw error;
+        showToast('Area ditambahkan!');
+      }
+
+      resetPinForm();
+      fetchPins();
+    } catch (err: any) {
+      console.error('[handleSavePin] FULL ERROR:', err);
+      showToast(`Gagal menyimpan area: ${err.message}`, 'error');
+    }
+    setPinLoading(false);
+  };
+
+  const handleDeletePin = async (id: number) => {
+    try {
+      const { error } = await supabase.from('room_pins').delete().eq('id', id);
+      if (error) throw error;
+      if (editingPinId === id) resetPinForm();
+      fetchPins();
+      showToast('Area dihapus!');
+    } catch (err: any) {
+      console.error('[handleDeletePin] FULL ERROR:', err);
+      showToast(`Gagal menghapus area: ${err.message}`, 'error');
     }
   };
 
@@ -324,11 +448,8 @@ export default function AdminPanel() {
     try {
       const panoToDelete = panoramas.find((p: any) => p.id === id);
 
-      // 1) Delete the image file from Supabase Storage
       if (panoToDelete?.image_url) {
         try {
-          // Extract the storage file path from the public URL
-          // e.g. https://<project>.supabase.co/storage/v1/object/public/panoramas/169999-abc.jpg
           const marker = '/panoramas/';
           const idx = panoToDelete.image_url.indexOf(marker);
           if (idx !== -1) {
@@ -339,7 +460,6 @@ export default function AdminPanel() {
               .remove([filePath]);
             if (storageError) {
               console.error('[handleDeletePanorama] storage remove error:', storageError);
-              // Don't throw here — still proceed to delete DB records even if the file is already gone
             }
           } else {
             console.warn('[handleDeletePanorama] could not parse file path from image_url:', panoToDelete.image_url);
@@ -349,7 +469,6 @@ export default function AdminPanel() {
         }
       }
 
-      // 2) Delete this panorama's own hotspots
       try {
         const res = await fetch(`${BASE_URL}/api/hotspots?panorama_id=${id}`);
         if (res.ok) {
@@ -366,7 +485,6 @@ export default function AdminPanel() {
         console.error('[handleDeletePanorama] own hotspot cleanup failed:', hsErr);
       }
 
-      // 3) Delete any hotspots on OTHER panoramas that target this one (avoid dangling links)
       try {
         const otherPanoramas = panoramas.filter((p: any) => p.id !== id);
         for (const pan of otherPanoramas) {
@@ -386,7 +504,6 @@ export default function AdminPanel() {
         console.error('[handleDeletePanorama] linking hotspot cleanup failed:', linkErr);
       }
 
-      // 4) Finally, delete the panorama record itself
       await deletePanorama(id);
 
       if (selectedPanorama?.id === id) { setSelectedPanorama(null); setHotspots([]); }
@@ -501,7 +618,6 @@ export default function AdminPanel() {
         .logout-btn { background: transparent; border: 1px solid #1e3d32; color: #4a7a68; font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.08em; padding: 0.4rem 0.7rem; border-radius: 6px; cursor: pointer; margin-left: 0.75rem; transition: all 0.2s; }
         .logout-btn:hover { border-color: #8b4444; color: #c47070; }
 
-        /* hamburger */
         .hamburger {
           display: none;
           flex-direction: column;
@@ -520,10 +636,8 @@ export default function AdminPanel() {
           transition: all 0.2s;
         }
 
-        /* layout */
         .main-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 60px); }
 
-        /* sidebar */
         .sidebar {
           background: #0d1a16;
           border-right: 1px solid #1e3d32;
@@ -539,14 +653,13 @@ export default function AdminPanel() {
         .nav-btn.active { background: #1e3d32; color: #4d9e7f; border-left: 2px solid #4d9e7f; }
         .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
 
-        /* content */
         .content { padding: 1.5rem; overflow-y: auto; }
 
         .section-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; color: #e8e6e0; margin-bottom: 0.25rem; }
         .section-sub { font-size: 0.7rem; color: #4a7a68; letter-spacing: 0.1em; margin-bottom: 1.5rem; }
 
         .card { background: #0d1a16; border: 1px solid #1e3d32; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
-        .card-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #4d9e7f; margin-bottom: 1rem; }
+        .card-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #4d9e7f; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
         .form-group { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
@@ -567,12 +680,17 @@ export default function AdminPanel() {
         .btn-primary { background: #1e3d32; color: #4d9e7f; border: 1px solid #3a6b5a; }
         .btn-primary:hover { background: #2a5040; color: #a8d5be; }
         .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-secondary { background: transparent; color: #7a9e90; border: 1px solid #1e3d32; }
+        .btn-secondary:hover { background: #1a3028; color: #a8d5be; }
         .btn-danger { background: transparent; color: #8b4444; border: 1px solid #4a2222; padding: 0.4rem 0.7rem; font-size: 0.72rem; }
         .btn-danger:hover { background: #2a1010; color: #c47070; border-color: #8b4444; }
         .btn-accent { background: transparent; color: #7a6a2a; border: 1px solid #4a3a10; padding: 0.4rem 0.7rem; font-size: 0.72rem; }
         .btn-accent:hover { background: #1a1500; color: #c4a840; border-color: #8b7030; }
         .btn-accent.on { background: #2a2000; color: #c4a840; border-color: #8b7030; }
+        .btn-edit { background: transparent; color: #4a6a9e; border: 1px solid #22344a; padding: 0.4rem 0.7rem; font-size: 0.72rem; }
+        .btn-edit:hover { background: #101a2a; color: #7098c4; border-color: #4468a4; }
         .first-badge { font-size: 0.62rem; background: #2a2000; color: #c4a840; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.1em; }
+        .editing-badge { font-size: 0.62rem; background: #1a1030; color: #9d7fd4; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.1em; }
 
         .panorama-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
         .panorama-card { background: #0a0a0f; border: 1px solid #1e3d32; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; cursor: pointer; }
@@ -588,6 +706,8 @@ export default function AdminPanel() {
         .hotspot-badge { font-size: 0.62rem; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.1em; display: inline-block; }
         .hotspot-badge.scene { background: #1e3d32; color: #4d9e7f; }
         .hotspot-badge.info { background: #1a1030; color: #9d7fd4; }
+        .hotspot-badge.linked { background: #1e3d32; color: #4d9e7f; }
+        .hotspot-badge.unlinked { background: #2a1010; color: #c47070; }
 
         .empty-state { text-align: center; padding: 2.5rem 1rem; color: #2a5040; font-size: 0.82rem; }
         .empty-icon { font-size: 2rem; margin-bottom: 0.75rem; }
@@ -604,7 +724,6 @@ export default function AdminPanel() {
 
         .info-box { background: #0a0f1a; border: 1px solid #1e2d5a; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.73rem; color: #5a7ab8; margin-bottom: 1rem; line-height: 1.6; }
 
-        /* click-to-place */
         .click-image-wrapper { position: relative; width: 100%; border-radius: 8px; overflow: hidden; cursor: crosshair; border: 1px solid #1e3d32; transition: border-color 0.2s; background: #0a0a0f; user-select: none; }
         .click-image-wrapper:hover { border-color: #4d9e7f; }
         .click-image-wrapper img { width: 100%; display: block; pointer-events: none; }
@@ -615,6 +734,10 @@ export default function AdminPanel() {
         .click-marker-dot { width: 6px; height: 6px; background: #4d9e7f; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         @keyframes markerPop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
+        /* existing (already-saved) pins shown on the denah while placing/editing a new one */
+        .existing-pin { position: absolute; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; }
+        .existing-pin-dot { width: 16px; height: 16px; border-radius: 50%; background: #c4a840; border: 2px solid #0a0a0f; box-shadow: 0 0 0 2px #c4a840; }
+
         .coord-readout { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; padding: 0.65rem 1rem; background: #0a0a0f; border: 1px solid #1e3d32; border-radius: 8px; font-size: 0.78rem; align-items: center; }
         .coord-empty { color: #2a5040; font-size: 0.72rem; letter-spacing: 0.05em; }
         .coord-pill { display: flex; align-items: center; gap: 0.5rem; }
@@ -622,23 +745,21 @@ export default function AdminPanel() {
         .coord-val { color: #a8d5be; font-size: 0.82rem; }
         .coord-divider { width: 1px; height: 14px; background: #1e3d32; }
 
-        /* room details grid (reuses panorama-card look) */
         .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
         .room-card { background: #0a0a0f; border: 1px solid #1e3d32; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; }
         .room-card:hover { border-color: #3a6b5a; }
+        .room-card.editing { border-color: #4a6a9e; }
         .room-img { width: 100%; height: 120px; object-fit: cover; display: block; background: #0d1a16; }
         .room-info { padding: 0.65rem 0.75rem; }
         .room-name { font-size: 0.82rem; color: #a8c8b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.3rem; }
         .room-meta { font-size: 0.65rem; color: #3a6b5a; margin-bottom: 0.5rem; }
         .room-desc { font-size: 0.7rem; color: #6b8f82; line-height: 1.5; margin-bottom: 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .room-actions { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; }
 
-        /* bottom tab bar for mobile */
         .bottom-tab-bar { display: none; }
 
-        /* ── MOBILE ── */
         @media (max-width: 768px) {
           .hamburger { display: flex; }
-
           .main-layout { grid-template-columns: 1fr; }
 
           .sidebar {
@@ -654,7 +775,6 @@ export default function AdminPanel() {
           }
           .sidebar.open { display: flex; }
 
-          /* overlay when sidebar open */
           .sidebar-overlay {
             display: none;
             position: fixed;
@@ -665,10 +785,8 @@ export default function AdminPanel() {
           .sidebar-overlay.open { display: block; }
 
           .content { padding: 1rem; padding-bottom: 5rem; }
-
           .section-title { font-size: 1.3rem; }
 
-          /* bottom nav bar */
           .bottom-tab-bar {
             display: flex;
             position: fixed;
@@ -700,7 +818,6 @@ export default function AdminPanel() {
           .bottom-tab-icon { font-size: 1.2rem; }
 
           .form-row { grid-template-columns: 1fr; }
-
           .stats-row { gap: 0.5rem; }
           .stat-num { font-size: 1.3rem; }
           .stat-label { font-size: 0.58rem; }
@@ -709,7 +826,6 @@ export default function AdminPanel() {
           .panorama-img, .room-img { height: 100px; }
 
           .hotspot-item { flex-direction: column; gap: 0.5rem; }
-
           .toast { left: 1rem; right: 1rem; bottom: 5rem; }
         }
 
@@ -733,14 +849,12 @@ export default function AdminPanel() {
         </div>
       </header>
 
-      {/* Sidebar overlay (mobile) */}
       <div
         className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
         onClick={() => setSidebarOpen(false)}
       />
 
       <div className="main-layout">
-        {/* Sidebar */}
         <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
           <div className="sidebar-label">Navigation</div>
           <button className={`nav-btn ${activeTab === 'panoramas' ? 'active' : ''}`} onClick={() => { setActiveTab('panoramas'); setSidebarOpen(false); }}>
@@ -755,7 +869,6 @@ export default function AdminPanel() {
             ? <div style={{ padding: '0.5rem 1rem', background: '#1a1e3d', borderRadius: '8px', fontSize: '0.78rem', color: '#a8b8d5' }}>🌐 {selectedPanorama.title || `ID: ${selectedPanorama.id}`}</div>
             : <div style={{ padding: '0.5rem 1rem', fontSize: '0.72rem', color: '#2a5040' }}>None selected</div>}
 
-          {/* Divider between panorama tools and room details */}
           <hr className="sidebar-divider" />
 
           <div className="sidebar-label">Content</div>
@@ -808,12 +921,7 @@ export default function AdminPanel() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">360° Image</label>
-
-                    {/* Ganti file-input-wrapper jadi begini */}
-                    <div
-                      className="file-input-wrapper"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
+                    <div className="file-input-wrapper" onClick={() => fileInputRef.current?.click()}>
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -977,18 +1085,24 @@ export default function AdminPanel() {
               <div className="section-sub">MANUAL PHOTO + TEXT FOR THE PUBLIC "DETAIL RUANGAN" PAGE</div>
 
               <div className="info-box">
-                💡 Upload a photo and fill in the info below. This feeds the room detail page visitors see when they tap "Detail Ruangan" on the homepage.
+                💡 Upload a photo and fill in the info below. This feeds the room detail page visitors see when they tap an area on the denah.
               </div>
 
+              {/* ── Add / Edit room form ── */}
               <div className="card">
-                <div className="card-title">// Add Room Detail</div>
+                <div className="card-title">
+                  <span>{editingRoomId ? `// Editing Room #${editingRoomId}` : '// Add Room Detail'}</span>
+                  {editingRoomId && <span className="editing-badge">EDITING</span>}
+                </div>
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Room Name</label>
                     <input className="form-input" placeholder="e.g. Ruang RPL 1" value={roomName} onChange={e => setRoomName(e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Photo</label>
+                    <label className="form-label">
+                      Photo {editingRoomId ? '(kosongkan jika tidak diganti)' : ''}
+                    </label>
                     <div className="file-input-wrapper" onClick={() => roomFileInputRef.current?.click()}>
                       <input
                         ref={roomFileInputRef}
@@ -1025,18 +1139,29 @@ export default function AdminPanel() {
                   />
                 </div>
 
-                <button className="btn btn-primary" onClick={handleAddRoom} disabled={roomLoading || !roomImageFile || !roomName.trim()} style={{ width: '100%' }}>
-                  {roomLoading ? 'Saving...' : '+ Add Room Detail'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleSaveRoom}
+                    disabled={roomLoading || !roomName.trim() || (!editingRoomId && !roomImageFile)}
+                    style={{ flex: 1 }}
+                  >
+                    {roomLoading ? 'Saving...' : editingRoomId ? '✓ Save Changes' : '+ Add Room Detail'}
+                  </button>
+                  {editingRoomId && (
+                    <button className="btn btn-secondary" onClick={resetRoomForm}>Cancel</button>
+                  )}
+                </div>
               </div>
 
+              {/* ── Room list ── */}
               <div className="card">
                 <div className="card-title">// All Rooms ({rooms.length})</div>
                 {rooms.length === 0
                   ? <div className="empty-state"><div className="empty-icon">🖼️</div>No room details yet. Add one above!</div>
                   : <div className="room-grid">
                     {rooms.map((room: any) => (
-                      <div key={room.id} className="room-card">
+                      <div key={room.id} className={`room-card ${editingRoomId === room.id ? 'editing' : ''}`}>
                         <img className="room-img" src={room.image_url} alt={room.name}
                           onError={(e: any) => { e.target.src = ''; e.target.style.background = '#1e3d32'; }} />
                         <div className="room-info">
@@ -1045,13 +1170,135 @@ export default function AdminPanel() {
                             {room.location ? `📍 ${room.location}` : ''}{room.location && room.capacity ? ' · ' : ''}{room.capacity ? `👥 ${room.capacity}` : ''}
                           </div>
                           {room.description && <div className="room-desc">{room.description}</div>}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div className="room-actions">
                             <span style={{ fontSize: '0.62rem', color: '#3a6b5a' }}>ID: {room.id}</span>
-                            <button className="btn btn-danger" onClick={() => handleDeleteRoom(room.id)}>Del</button>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              <button className="btn btn-edit" onClick={() => handleEditRoomClick(room)}>Edit</button>
+                              <button className="btn btn-danger" onClick={() => handleDeleteRoom(room.id)}>Del</button>
+                            </div>
                           </div>
                         </div>
                       </div>
                     ))}
+                  </div>}
+              </div>
+
+              {/* ── Denah / map pin editor ── */}
+              <div className="section-title" style={{ marginTop: '2rem', fontSize: '1.3rem' }}>Peta Denah Ruangan</div>
+              <div className="section-sub">TENTUKAN AREA MANA YANG BISA DIKLIK PENGUNJUNG DI DENAH</div>
+
+              <div className="info-box">
+                💡 Tap posisi ruangan di denah untuk menandai area, kasih label, lalu (opsional) hubungkan ke salah satu Room Detail di atas. Kalau belum dihubungkan ke room manapun, pengunjung akan lihat pesan "belum tersedia" saat nge-tap area itu.
+              </div>
+
+              <div className="card">
+                <div className="card-title">
+                  <span>{editingPinId ? `// Editing Area #${editingPinId}` : '// Step 1 — Tap posisi di denah'}</span>
+                  {editingPinId && <span className="editing-badge">EDITING</span>}
+                </div>
+                <div className="click-image-wrapper" ref={mapImageRef} onClick={handleMapClick}>
+                  <img src="/denah-sekolah.jpg" alt="Denah SMK Negeri 11 Bandung" draggable={false}
+                    onError={(e: any) => { e.target.style.display = 'none'; }} />
+                  {!pinMarker && <div className="crosshair-label">Tap to place area</div>}
+
+                  {/* Show already-saved pins for reference (skip the one currently being edited) */}
+                  {pins.filter(p => p.id !== editingPinId).map((p: any) => (
+                    <div key={p.id} className="existing-pin" style={{ left: `${p.map_x}%`, top: `${p.map_y}%` }}>
+                      <div className="existing-pin-dot" />
+                    </div>
+                  ))}
+
+                  {pinMarker && (
+                    <div className="click-marker" style={{ left: `${pinMarker.x}%`, top: `${pinMarker.y}%` }}>
+                      <div className="click-marker-ring"><div className="click-marker-dot" /></div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="coord-readout">
+                  {!pinMarker ? (
+                    <span className="coord-empty">↑ Tap di denah untuk menentukan posisi area</span>
+                  ) : (
+                    <>
+                      <div className="coord-pill">
+                        <span className="coord-key">X</span>
+                        <span className="coord-val">{pinMarker.x}%</span>
+                      </div>
+                      <div className="coord-divider" />
+                      <div className="coord-pill">
+                        <span className="coord-key">Y</span>
+                        <span className="coord-val">{pinMarker.y}%</span>
+                      </div>
+                      <div style={{ marginLeft: 'auto' }}>
+                        <button className="btn btn-danger" style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem' }}
+                          onClick={() => setPinMarker(null)}>
+                          Clear
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-title">// Step 2 — Label & hubungkan ke room</div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Label Area</label>
+                    <input className="form-input" placeholder="e.g. Ruang Teori 7" value={pinLabel} onChange={e => setPinLabel(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Hubungkan ke Room Detail</label>
+                    <select className="form-input" value={pinRoomId} onChange={e => setPinRoomId(e.target.value)}>
+                      <option value="">Belum ada detail</option>
+                      {rooms.map((r: any) => (
+                        <option key={r.id} value={r.id}>{r.name} (ID: {r.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleSavePin}
+                    disabled={pinLoading || !pinMarker || !pinLabel.trim()}
+                    style={{ flex: 1 }}
+                  >
+                    {pinLoading ? 'Saving...' : editingPinId ? '✓ Save Area' : '+ Add Area'}
+                  </button>
+                  {(editingPinId || pinMarker || pinLabel) && (
+                    <button className="btn btn-secondary" onClick={resetPinForm}>Cancel</button>
+                  )}
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-title">// Areas on Denah ({pins.length})</div>
+                {pins.length === 0
+                  ? <div className="empty-state"><div className="empty-icon">📍</div>Belum ada area. Tandai di denah di atas!</div>
+                  : <div className="hotspot-list">
+                    {pins.map((pin: any) => {
+                      const linkedRoom = rooms.find((r: any) => r.id === pin.room_id);
+                      return (
+                        <div key={pin.id} className="hotspot-item">
+                          <div className="hotspot-item-info">
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span className={`hotspot-badge ${linkedRoom ? 'linked' : 'unlinked'}`}>
+                                {linkedRoom ? 'TERHUBUNG' : 'BELUM TERHUBUNG'}
+                              </span>
+                              <span style={{ color: '#c8d8d0', fontSize: '0.8rem' }}>{pin.label}</span>
+                            </div>
+                            <span style={{ color: '#3a6b5a', fontSize: '0.68rem' }}>x: {pin.map_x}% | y: {pin.map_y}%</span>
+                            {linkedRoom && <span style={{ color: '#4a7a68', fontSize: '0.68rem' }}>→ {linkedRoom.name}</span>}
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button className="btn btn-edit" onClick={() => handleEditPinClick(pin)}>Edit</button>
+                            <button className="btn btn-danger" onClick={() => handleDeletePin(pin.id)}>Del</button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>}
               </div>
             </>
