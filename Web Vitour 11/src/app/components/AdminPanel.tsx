@@ -38,14 +38,24 @@ export default function AdminPanel() {
   const [hsYaw, setHsYaw] = useState('');
   const [hsText, setHsText] = useState('');
   const [hsTargetId, setHsTargetId] = useState('');
-  const [activeTab, setActiveTab] = useState<'panoramas' | 'hotspots'>('panoramas');
+  const [activeTab, setActiveTab] = useState<'panoramas' | 'hotspots' | 'details'>('panoramas');
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [clickMarker, setClickMarker] = useState<{ x: number; y: number } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // ── ROOM DETAILS STATE (feeds the public "Detail Ruangan" page) ──
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [roomName, setRoomName] = useState('');
+  const [roomDescription, setRoomDescription] = useState('');
+  const [roomLocation, setRoomLocation] = useState('');
+  const [roomCapacity, setRoomCapacity] = useState('');
+  const [roomImageFile, setRoomImageFile] = useState<File | null>(null);
+  const [roomLoading, setRoomLoading] = useState(false);
+
   const imageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const roomFileInputRef = useRef<HTMLInputElement>(null);
   const lastCheckRef = useRef<number>(0);
 
   // ── AUTH: check session on mount + listen for changes ──
@@ -140,6 +150,9 @@ export default function AdminPanel() {
     }
   }, [selectedPanorama]);
 
+  // Load room details once logged in
+  useEffect(() => { if (session) fetchRooms(); }, [session]);
+
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -179,6 +192,82 @@ export default function AdminPanel() {
     } catch (err: any) {
       console.error('[fetchHotspots] FULL ERROR:', err);
       showToast(`Failed to fetch hotspots: ${err.message}`, 'error');
+    }
+  };
+
+  // ── ROOM DETAILS: fetch / add / delete ──
+  const fetchRooms = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setRooms(data || []);
+    } catch (err: any) {
+      console.error('[fetchRooms] FULL ERROR:', err);
+      showToast(`Failed to fetch room details: ${err.message}`, 'error');
+    }
+  };
+
+  const handleAddRoom = async () => {
+    if (!roomImageFile) { showToast('Please select a photo', 'error'); return; }
+    if (!roomName.trim()) { showToast('Please enter a room name', 'error'); return; }
+    setRoomLoading(true);
+    try {
+      const fileExt = roomImageFile.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('room-images')
+        .upload(fileName, roomImageFile, { contentType: roomImageFile.type });
+      if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('room-images')
+        .getPublicUrl(fileName);
+
+      const { error: insertError } = await supabase.from('rooms').insert({
+        name: roomName,
+        description: roomDescription,
+        image_url: publicUrl,
+        location: roomLocation || null,
+        capacity: roomCapacity ? Number(roomCapacity) : null,
+      });
+      if (insertError) throw new Error(insertError.message);
+
+      setRoomName(''); setRoomDescription(''); setRoomLocation(''); setRoomCapacity(''); setRoomImageFile(null);
+      fetchRooms();
+      showToast('Room detail added!');
+    } catch (err: any) {
+      console.error('[handleAddRoom] FULL ERROR:', err);
+      showToast(`Failed to add room: ${err.message || err}`, 'error');
+    }
+    setRoomLoading(false);
+  };
+
+  const handleDeleteRoom = async (id: number) => {
+    try {
+      const roomToDelete = rooms.find((r: any) => r.id === id);
+
+      if (roomToDelete?.image_url) {
+        const marker = '/room-images/';
+        const idx = roomToDelete.image_url.indexOf(marker);
+        if (idx !== -1) {
+          const filePath = roomToDelete.image_url.substring(idx + marker.length);
+          const { error: storageError } = await supabase.storage.from('room-images').remove([filePath]);
+          if (storageError) console.error('[handleDeleteRoom] storage remove error:', storageError);
+        }
+      }
+
+      const { error } = await supabase.from('rooms').delete().eq('id', id);
+      if (error) throw error;
+
+      fetchRooms();
+      showToast('Room detail deleted!');
+    } catch (err: any) {
+      console.error('[handleDeleteRoom] FULL ERROR:', err);
+      showToast(`Failed to delete room: ${err.message}`, 'error');
     }
   };
 
@@ -443,6 +532,7 @@ export default function AdminPanel() {
           flex-direction: column;
           gap: 0.5rem;
         }
+        .sidebar-divider { border: none; border-top: 1px solid #1e3d32; margin: 1.25rem 0.25rem; }
         .sidebar-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #3a6b5a; padding: 0.5rem 0.75rem; margin-top: 0.5rem; }
         .nav-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 8px; border: none; background: transparent; color: #7a9e90; font-family: 'DM Mono', monospace; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; text-align: left; width: 100%; }
         .nav-btn:hover { background: #1a3028; color: #a8d5be; }
@@ -465,6 +555,7 @@ export default function AdminPanel() {
         .form-input:focus { border-color: #4d9e7f; }
         .form-input::placeholder { color: #2a5040; }
         select.form-input option { background: #0a0a0f; }
+        textarea.form-input { resize: vertical; min-height: 80px; font-family: 'DM Mono', monospace; }
 
         .file-input-wrapper { position: relative; background: #0a0a0f; border: 1px dashed #1e3d32; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
         .file-input-wrapper:hover { border-color: #4d9e7f; }
@@ -530,6 +621,16 @@ export default function AdminPanel() {
         .coord-key { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.15em; color: #3a6b5a; }
         .coord-val { color: #a8d5be; font-size: 0.82rem; }
         .coord-divider { width: 1px; height: 14px; background: #1e3d32; }
+
+        /* room details grid (reuses panorama-card look) */
+        .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .room-card { background: #0a0a0f; border: 1px solid #1e3d32; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; }
+        .room-card:hover { border-color: #3a6b5a; }
+        .room-img { width: 100%; height: 120px; object-fit: cover; display: block; background: #0d1a16; }
+        .room-info { padding: 0.65rem 0.75rem; }
+        .room-name { font-size: 0.82rem; color: #a8c8b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.3rem; }
+        .room-meta { font-size: 0.65rem; color: #3a6b5a; margin-bottom: 0.5rem; }
+        .room-desc { font-size: 0.7rem; color: #6b8f82; line-height: 1.5; margin-bottom: 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
         /* bottom tab bar for mobile */
         .bottom-tab-bar { display: none; }
@@ -604,8 +705,8 @@ export default function AdminPanel() {
           .stat-num { font-size: 1.3rem; }
           .stat-label { font-size: 0.58rem; }
 
-          .panorama-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; }
-          .panorama-img { height: 100px; }
+          .panorama-grid, .room-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; }
+          .panorama-img, .room-img { height: 100px; }
 
           .hotspot-item { flex-direction: column; gap: 0.5rem; }
 
@@ -613,7 +714,7 @@ export default function AdminPanel() {
         }
 
         @media (max-width: 400px) {
-          .panorama-grid { grid-template-columns: 1fr 1fr; }
+          .panorama-grid, .room-grid { grid-template-columns: 1fr 1fr; }
         }
       `}</style>
 
@@ -653,6 +754,14 @@ export default function AdminPanel() {
           {selectedPanorama
             ? <div style={{ padding: '0.5rem 1rem', background: '#1a1e3d', borderRadius: '8px', fontSize: '0.78rem', color: '#a8b8d5' }}>🌐 {selectedPanorama.title || `ID: ${selectedPanorama.id}`}</div>
             : <div style={{ padding: '0.5rem 1rem', fontSize: '0.72rem', color: '#2a5040' }}>None selected</div>}
+
+          {/* Divider between panorama tools and room details */}
+          <hr className="sidebar-divider" />
+
+          <div className="sidebar-label">Content</div>
+          <button className={`nav-btn ${activeTab === 'details' ? 'active' : ''}`} onClick={() => { setActiveTab('details'); setSidebarOpen(false); }}>
+            <span className="nav-icon">🖼️</span> Room Details
+          </button>
         </aside>
 
         <main className="content">
@@ -851,6 +960,93 @@ export default function AdminPanel() {
                 </>}
             </>
           )}
+
+          {/* ── ROOM DETAILS TAB ── */}
+          {activeTab === 'details' && (
+            <>
+              <div className="section-title">Room Details</div>
+              <div className="section-sub">MANUAL PHOTO + TEXT FOR THE PUBLIC "DETAIL RUANGAN" PAGE</div>
+
+              <div className="info-box">
+                💡 Upload a photo and fill in the info below. This feeds the room detail page visitors see when they tap "Detail Ruangan" on the homepage.
+              </div>
+
+              <div className="card">
+                <div className="card-title">// Add Room Detail</div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Room Name</label>
+                    <input className="form-input" placeholder="e.g. Ruang RPL 1" value={roomName} onChange={e => setRoomName(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Photo</label>
+                    <div className="file-input-wrapper" onClick={() => roomFileInputRef.current?.click()}>
+                      <input
+                        ref={roomFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={e => setRoomImageFile(e.target.files?.[0] || null)}
+                      />
+                      <div className="file-label">
+                        {roomImageFile ? <strong>{roomImageFile.name}</strong> : <><strong>Pilih gambar</strong> atau tap di sini</>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Location (optional)</label>
+                    <input className="form-input" placeholder="e.g. Lantai 2, Gedung A" value={roomLocation} onChange={e => setRoomLocation(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Capacity (optional)</label>
+                    <input className="form-input" type="number" placeholder="e.g. 36" value={roomCapacity} onChange={e => setRoomCapacity(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Description</label>
+                  <textarea
+                    className="form-input"
+                    placeholder="Deskripsikan ruangan ini..."
+                    value={roomDescription}
+                    onChange={e => setRoomDescription(e.target.value)}
+                  />
+                </div>
+
+                <button className="btn btn-primary" onClick={handleAddRoom} disabled={roomLoading || !roomImageFile || !roomName.trim()} style={{ width: '100%' }}>
+                  {roomLoading ? 'Saving...' : '+ Add Room Detail'}
+                </button>
+              </div>
+
+              <div className="card">
+                <div className="card-title">// All Rooms ({rooms.length})</div>
+                {rooms.length === 0
+                  ? <div className="empty-state"><div className="empty-icon">🖼️</div>No room details yet. Add one above!</div>
+                  : <div className="room-grid">
+                    {rooms.map((room: any) => (
+                      <div key={room.id} className="room-card">
+                        <img className="room-img" src={room.image_url} alt={room.name}
+                          onError={(e: any) => { e.target.src = ''; e.target.style.background = '#1e3d32'; }} />
+                        <div className="room-info">
+                          <div className="room-name">{room.name}</div>
+                          <div className="room-meta">
+                            {room.location ? `📍 ${room.location}` : ''}{room.location && room.capacity ? ' · ' : ''}{room.capacity ? `👥 ${room.capacity}` : ''}
+                          </div>
+                          {room.description && <div className="room-desc">{room.description}</div>}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.62rem', color: '#3a6b5a' }}>ID: {room.id}</span>
+                            <button className="btn btn-danger" onClick={() => handleDeleteRoom(room.id)}>Del</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>}
+              </div>
+            </>
+          )}
         </main>
       </div>
 
@@ -863,6 +1059,10 @@ export default function AdminPanel() {
         <button className={`bottom-tab-btn ${activeTab === 'hotspots' ? 'active' : ''}`} onClick={() => setActiveTab('hotspots')}>
           <span className="bottom-tab-icon">🎯</span>
           Hotspots
+        </button>
+        <button className={`bottom-tab-btn ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>
+          <span className="bottom-tab-icon">🖼️</span>
+          Details
         </button>
       </nav>
 
