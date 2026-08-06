@@ -109,7 +109,7 @@ export default function RoomMap() {
         ) : (
           <div className="relative rounded-xl overflow-hidden border border-[#c2c6d5] shadow-lg bg-[#f0f3ff]">
             <img
-              src="/denah-sekolah.jpg"
+              src="/Denah.jpeg"
               alt="Denah SMK Negeri 11 Bandung"
               className="w-full h-auto block select-none"
               draggable={false}

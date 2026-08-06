@@ -77,7 +77,7 @@ export default function DetailRoom() {
             className="inline-flex items-center gap-2 mt-2 text-sm md:text-base text-[#0667d3] hover:text-[#004fa7] transition-colors"
           >
             <ArrowLeft size={16} />
-            Kembali ke Beranda
+            Kembali ke Denah
           </Link>
         </div>
       </div>

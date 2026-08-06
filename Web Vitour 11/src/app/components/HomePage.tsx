@@ -153,7 +153,7 @@ export default function HomePage() {
                   Mulai Tour Virtual
                 </Button>
               </Link>
-              <Link to="/Details/1">
+              <Link to="/Details"> 
                 <Button
                   size="default"
                   className="flex items-center gap-2 bg-[#0667d3] text-white hover:bg-[#004fa7] rounded-md text-sm md:text-base px-5 md:px-6 py-2.5 md:py-3 h-auto transition-transform duration-200 hover:scale-105 active:scale-95 w-full sm:w-auto"
