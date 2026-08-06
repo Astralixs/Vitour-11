@@ -130,11 +130,11 @@ export default function DetailRoom() {
     <div className="min-h-screen bg-white">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-16">
         <Link
-          to="/"
+          to="/Details"
           className="inline-flex items-center gap-2 mb-6 md:mb-10 text-sm md:text-base text-[#0667d3] hover:text-[#004fa7] transition-colors"
         >
           <ArrowLeft size={16} />
-          Kembali ke Beranda
+          Kembali ke Map
         </Link>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
