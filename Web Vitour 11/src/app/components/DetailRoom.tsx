@@ -73,11 +73,11 @@ export default function DetailRoom() {
             {error ?? 'Data untuk ruangan ini tidak tersedia.'}
           </p>
           <Link
-            to="/"
+            to="/Details"
             className="inline-flex items-center gap-2 mt-2 text-sm md:text-base text-[#0667d3] hover:text-[#004fa7] transition-colors"
           >
             <ArrowLeft size={16} />
-            Kembali ke Denah
+            Kembali ke Map
           </Link>
         </div>
       </div>
