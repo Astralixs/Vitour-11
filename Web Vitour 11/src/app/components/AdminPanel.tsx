@@ -961,8 +961,6 @@ export default function AdminPanel() {
           <div className="logo">ViTour <span>Admin Console</span></div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <span className="status-dot" />
-          <span className="status-text">ONLINE</span>
           <button className="logout-btn" onClick={handleLogout}>Logout</button>
         </div>
       </header>
