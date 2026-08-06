@@ -128,11 +128,11 @@ export default function RoomMap() {
                   aria-label={pin.label}
                 >
                   <span
-                    className={`flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 md:w-9 md:h-9 rounded-full text-white shadow-md ring-2 ring-white transition-transform group-hover:scale-110 ${
+                    className={`flex items-center justify-center w-3.5 h-3.5 sm:w-6 sm:h-6 md:w-9 md:h-9 rounded-full text-white shadow-md ring-2 ring-white transition-transform group-hover:scale-110 opacity-50 hover:opacity-100 ${
                       available ? 'bg-[#0667d3]' : 'bg-[#9aa3b5]'
                     }`}
                   >
-                    <MapPin size={12} className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
+                    <MapPin size={12} className="w-2 h-2 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 opacity-70 group-hover:opacity-100 group-active:opacity-100 transition-opacity" />
                   </span>
                   <span className="absolute left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap text-[10px] md:text-xs bg-black/75 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                     {pin.label}
