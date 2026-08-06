@@ -33,9 +33,6 @@ export default function HomePage() {
   const [activeSection, setActiveSection] = useState('home');
   const [scrolled, setScrolled] = useState(false);
 
-  const aboutReveal = useReveal();
-  const aboutImage = useReveal();
-  const accreditationReveal = useReveal();
   const locationReveal = useReveal();
   const locationInfo = useReveal();
   const locationMap = useReveal();
@@ -56,7 +53,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const sections = ['home', 'about', 'location'];
+    const sections = ['home', 'location'];
     const observers: IntersectionObserver[] = [];
 
     sections.forEach(id => {
@@ -119,7 +116,6 @@ export default function HomePage() {
           <h1 className="text-lg md:text-2xl font-bold">Virtual Tour 11</h1>
           <div className="flex gap-3 md:gap-6 text-sm md:text-base">
             <a href="#home" className={`hover:text-blue-200 transition-colors ${activeSection === 'home' ? 'font-bold underline' : ''}`}>Home</a>
-            <a href="#about" className={`hover:text-blue-200 transition-colors ${activeSection === 'about' ? 'font-bold underline' : ''}`}>About</a>
             <a href="#location" className={`hover:text-blue-200 transition-colors ${activeSection === 'location' ? 'font-bold underline' : ''}`}>Location</a>
           </div>
         </div>
@@ -164,73 +160,6 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* About Section */}
-      <section id="about" className="py-12 md:py-20 px-4 md:px-16 bg-white">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
-          <div ref={aboutReveal.ref} className={`space-y-5 md:space-y-6 ${fadeUp(aboutReveal.visible)}`}>
-            <div className="inline-block px-3 py-1 bg-[#d7e2ff] text-[#004491] rounded-full text-xs md:text-sm font-medium">
-              Tentang Kami
-            </div>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#004fa7] leading-snug">
-              Beacon of Vocational Education
-            </h2>
-            <p className="text-[#424753] text-sm md:text-base leading-relaxed">
-              SMK Negeri 11 Bandung merupakan lembaga pendidikan kejuruan yang berkomitmen untuk mencetak
-              lulusan kompeten di berbagai bidang teknologi dan bisnis. Kami mengintegrasikan kurikulum
-              industri dengan nilai-nilai karakter untuk memastikan setiap siswa siap menghadapi tantangan
-              masa depan.
-            </p>
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
-              <div className="p-4 bg-[#f0f3ff] rounded-lg border border-[#c2c6d5]">
-                <h3 className="text-xl md:text-2xl font-bold text-[#004fa7]">25+</h3>
-                <p className="text-xs md:text-sm text-[#424753]">Tahun Pengalaman</p>
-              </div>
-              <div className="p-4 bg-[#f0f3ff] rounded-lg border border-[#c2c6d5]">
-                <h3 className="text-xl md:text-2xl font-bold text-[#004fa7]">12</h3>
-                <p className="text-xs md:text-sm text-[#424753]">Jurusan Unggulan</p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            ref={aboutImage.ref}
-            className={`img-zoom relative rounded-xl overflow-hidden aspect-video shadow-lg border border-[#c2c6d5] bg-white card-hover ${fadeUp(aboutImage.visible, 250)}`}
-          >
-            <img
-              className="w-full h-full object-cover"
-              src="/IMG_0157.jpeg"
-              alt="Siswa SMKN 11 Bandung belajar di ruang kelas modern"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Accreditation Section */}
-      <section
-        ref={accreditationReveal.ref}
-        className={`py-10 md:py-16 px-4 md:px-16 bg-[#0667d3] text-white overflow-hidden relative ${fadeUp(accreditationReveal.visible)}`}
-      >
-        <div className="absolute right-0 top-0 opacity-10 translate-x-1/4 -translate-y-1/4 pointer-events-none">
-          <ShieldCheck size={280} />
-        </div>
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center relative z-10 gap-6 md:gap-8 text-center md:text-left">
-          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-            <div className="bg-white/20 p-3 md:p-4 rounded-full">
-              <ShieldCheck size={36} />
-            </div>
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold">Accredited A</h2>
-              <p className="opacity-90 text-sm md:text-base">Highest Institutional Rating by National Accreditation Board</p>
-            </div>
-          </div>
-          <button className="bg-white text-[#0667d3] px-6 md:px-8 py-3 rounded-lg font-medium text-sm md:text-base hover:bg-[#f0f3ff] transition-colors shadow-sm w-full sm:w-auto">
-           <a href="https://referensi.data.kemendikdasmen.go.id/snpmb/site/sekolah?npsn=20219175" target="_blank" rel="noopener noreferrer">
-              Lihat Sertifikasi
-            </a>
-          </button>
         </div>
       </section>
 

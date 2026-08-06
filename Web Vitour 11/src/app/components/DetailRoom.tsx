@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Loader2, MapPin, Users } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, MapPin, Users } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // Adjust this import if you already have a shared Supabase client
@@ -20,9 +20,17 @@ interface Room {
   capacity?: number;
 }
 
+interface RoomImage {
+  id: number;
+  image_url: string;
+  position: number;
+}
+
 export default function DetailRoom() {
   const { id } = useParams();
   const [room, setRoom] = useState<Room | null>(null);
+  const [images, setImages] = useState<string[]>([]); // cover photo + gallery, combined
+  const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,23 +41,55 @@ export default function DetailRoom() {
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      setActiveIndex(0);
 
-    supabase
-      .from('rooms')
-      .select('*')
-      .eq('id', id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
-        } else {
-          setRoom(data as Room);
-        }
+      const { data: roomData, error: roomError } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (roomError || !roomData) {
+        setError(roomError?.message ?? 'Data untuk ruangan ini tidak tersedia.');
         setLoading(false);
-      });
+        return;
+      }
+
+      setRoom(roomData as Room);
+
+      const { data: galleryData } = await supabase
+        .from('room_images')
+        .select('id, image_url, position')
+        .eq('room_id', id)
+        .order('position', { ascending: true });
+
+      const gallery = ((galleryData || []) as RoomImage[]).map(g => g.image_url);
+      // Cover photo always comes first, then any additional gallery photos.
+      const combined = [roomData.image_url, ...gallery].filter(Boolean);
+      setImages(combined);
+
+      setLoading(false);
+    };
+
+    load();
   }, [id]);
+
+  const goPrev = () => setActiveIndex(i => (i - 1 + images.length) % images.length);
+  const goNext = () => setActiveIndex(i => (i + 1) % images.length);
+
+  // Auto-advance the carousel every 4s. Restarting the timer whenever activeIndex
+  // changes (whether from autoplay or a manual click) means each slide always
+  // gets a full 4s of view time, and manual navigation never fights the timer.
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveIndex(i => (i + 1) % images.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [images.length, activeIndex]);
 
   if (loading) {
     return (
@@ -73,36 +113,96 @@ export default function DetailRoom() {
             {error ?? 'Data untuk ruangan ini tidak tersedia.'}
           </p>
           <Link
-            to="/Details"
+            to="/"
             className="inline-flex items-center gap-2 mt-2 text-sm md:text-base text-[#0667d3] hover:text-[#004fa7] transition-colors"
           >
             <ArrowLeft size={16} />
-            Kembali ke Map
+            Kembali ke Beranda
           </Link>
         </div>
       </div>
     );
   }
 
+  const hasMultipleImages = images.length > 1;
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-16">
         <Link
-          to="/Details"
+          to="/"
           className="inline-flex items-center gap-2 mb-6 md:mb-10 text-sm md:text-base text-[#0667d3] hover:text-[#004fa7] transition-colors"
         >
           <ArrowLeft size={16} />
-          Kembali ke Map
+          Kembali ke Beranda
         </Link>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
-          {/* Photo */}
-          <div className="rounded-xl overflow-hidden shadow-lg border border-[#c2c6d5] aspect-video bg-[#f0f3ff]">
-            <img
-              src={room.image_url}
-              alt={room.name}
-              className="w-full h-full object-cover"
-            />
+          {/* Photo / Carousel */}
+          <div>
+            <div className="relative rounded-xl overflow-hidden shadow-lg border border-[#c2c6d5] aspect-video bg-[#f0f3ff]">
+              <div
+                className="flex h-full transition-transform duration-500 ease-out"
+                style={{ transform: `translateX(-${activeIndex * 100}%)` }}
+              >
+                {images.map((src, i) => (
+                  <img
+                    key={i}
+                    src={src}
+                    alt={room.name}
+                    className="w-full h-full object-cover flex-shrink-0"
+                  />
+                ))}
+              </div>
+
+              {hasMultipleImages && (
+                <>
+                  <button
+                    onClick={goPrev}
+                    aria-label="Foto sebelumnya"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    onClick={goNext}
+                    aria-label="Foto berikutnya"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {images.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setActiveIndex(i)}
+                        aria-label={`Foto ${i + 1}`}
+                        className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full transition-colors ${
+                          i === activeIndex ? 'bg-white' : 'bg-white/50'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {hasMultipleImages && (
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                {images.map((src, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveIndex(i)}
+                    className={`shrink-0 w-16 h-12 md:w-20 md:h-14 rounded-lg overflow-hidden border-2 transition-colors ${
+                      i === activeIndex ? 'border-[#0667d3]' : 'border-transparent'
+                    }`}
+                  >
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Text */}

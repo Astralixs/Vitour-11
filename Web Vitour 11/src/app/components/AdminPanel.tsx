@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPanorama, getPanoramas, deletePanorama } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import type { Session } from '@supabase/supabase-js';
@@ -50,9 +50,29 @@ export default function AdminPanel() {
   const [roomDescription, setRoomDescription] = useState('');
   const [roomLocation, setRoomLocation] = useState('');
   const [roomCapacity, setRoomCapacity] = useState('');
-  const [roomImageFile, setRoomImageFile] = useState<File | null>(null);
   const [roomLoading, setRoomLoading] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState<number | null>(null);
+
+  // ── PHOTOS (single upload flow — first photo becomes the cover, any extra
+  // photos become gallery photos → the public page auto-shows a carousel) ──
+  const [galleryImages, setGalleryImages] = useState<any[]>([]); // already-saved gallery photos (only while editing)
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);   // newly picked, not uploaded yet
+  const galleryFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Local preview URLs for photos picked but not yet saved, so the admin can actually see
+  // the image (not just a filename) and remove one before confirming.
+  const galleryPreviews = useMemo(
+    () => galleryFiles.map(file => ({ file, url: URL.createObjectURL(file) })),
+    [galleryFiles]
+  );
+  useEffect(() => {
+    return () => { galleryPreviews.forEach(p => URL.revokeObjectURL(p.url)); };
+  }, [galleryPreviews]);
+
+  // The room currently being edited (for showing its existing cover photo in the carousel).
+  const currentEditingRoom = editingRoomId ? rooms.find((r: any) => r.id === editingRoomId) : null;
+
+  const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
 
   // ── DENAH / MAP PIN STATE (clickable areas on the school map) ──
   const [pins, setPins] = useState<any[]>([]);
@@ -64,7 +84,6 @@ export default function AdminPanel() {
 
   const imageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const roomFileInputRef = useRef<HTMLInputElement>(null);
   const mapImageRef = useRef<HTMLDivElement>(null);
   const lastCheckRef = useRef<number>(0);
 
@@ -225,7 +244,9 @@ export default function AdminPanel() {
     setRoomDescription('');
     setRoomLocation('');
     setRoomCapacity('');
-    setRoomImageFile(null);
+    setGalleryImages([]);
+    setGalleryFiles([]);
+    setPreviewSlideIndex(0);
   };
 
   const handleEditRoomClick = (room: any) => {
@@ -234,31 +255,107 @@ export default function AdminPanel() {
     setRoomDescription(room.description || '');
     setRoomLocation(room.location || '');
     setRoomCapacity(room.capacity ? String(room.capacity) : '');
-    setRoomImageFile(null); // leave empty = keep existing photo unless admin picks a new one
+    setGalleryFiles([]);
+    setPreviewSlideIndex(0);
+    fetchGalleryImages(room.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // ── GALLERY IMAGES: fetch existing / delete existing (adding new ones happens on Save) ──
+  const fetchGalleryImages = async (roomId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('room_images')
+        .select('*')
+        .eq('room_id', roomId)
+        .order('position', { ascending: true });
+      if (error) throw error;
+      setGalleryImages(data || []);
+    } catch (err: any) {
+      console.error('[fetchGalleryImages] FULL ERROR:', err);
+      showToast(`Failed to fetch gallery photos: ${err.message}`, 'error');
+    }
+  };
+
+  // Remove a photo that was picked but not yet uploaded/saved.
+  const handleRemoveGalleryFile = (index: number) => {
+    setGalleryFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDeleteGalleryImage = async (img: any) => {
+    try {
+      const marker = '/room-images/';
+      const idx = img.image_url.indexOf(marker);
+      if (idx !== -1) {
+        const filePath = img.image_url.substring(idx + marker.length);
+        const { error: storageError } = await supabase.storage.from('room-images').remove([filePath]);
+        if (storageError) console.error('[handleDeleteGalleryImage] storage remove error:', storageError);
+      }
+
+      const { error } = await supabase.from('room_images').delete().eq('id', img.id);
+      if (error) throw error;
+
+      if (editingRoomId) fetchGalleryImages(editingRoomId);
+      showToast('Foto dihapus!');
+    } catch (err: any) {
+      console.error('[handleDeleteGalleryImage] FULL ERROR:', err);
+      showToast(`Gagal menghapus foto: ${err.message}`, 'error');
+    }
+  };
+
+  // Cover photo (existing, while editing) + saved gallery photos + newly picked photos,
+  // combined into one ordered list — this mirrors exactly what the public "Detail Ruangan"
+  // carousel shows. When CREATING a new room, the first newly picked photo is the cover.
+  const roomPreviewSlides = useMemo(() => {
+    const slides: { key: string; url: string; label: string; onDelete?: () => void }[] = [];
+
+    if (currentEditingRoom?.image_url) {
+      slides.push({ key: 'cover-existing', url: currentEditingRoom.image_url, label: 'Cover' });
+    }
+
+    galleryImages.forEach((img: any) => {
+      slides.push({ key: `saved-${img.id}`, url: img.image_url, label: 'Foto tambahan', onDelete: () => handleDeleteGalleryImage(img) });
+    });
+
+    galleryPreviews.forEach((p, idx) => {
+      const isNewCover = !currentEditingRoom && idx === 0; // creating new room: first picked photo = cover
+      slides.push({
+        key: `new-${idx}`,
+        url: p.url,
+        label: isNewCover ? 'Cover (baru)' : 'Foto tambahan (baru)',
+        onDelete: () => handleRemoveGalleryFile(idx),
+      });
+    });
+
+    return slides;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEditingRoom, galleryImages, galleryPreviews]);
+
+  useEffect(() => {
+    if (previewSlideIndex >= roomPreviewSlides.length) setPreviewSlideIndex(0);
+  }, [roomPreviewSlides.length, previewSlideIndex]);
+
   // Handles BOTH creating a new room and saving edits to an existing one.
+  // All photos are picked through the single multi-file input above, uploaded together here.
   const handleSaveRoom = async () => {
     if (!roomName.trim()) { showToast('Please enter a room name', 'error'); return; }
-    if (!editingRoomId && !roomImageFile) { showToast('Please select a photo', 'error'); return; }
+    if (!editingRoomId && galleryFiles.length === 0) { showToast('Please select at least one photo', 'error'); return; }
 
     setRoomLoading(true);
     try {
-      let imageUrl: string | undefined;
-
-      if (roomImageFile) {
-        const fileExt = roomImageFile.name.split('.').pop();
+      const uploadedUrls: string[] = [];
+      for (const file of galleryFiles) {
+        const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('room-images')
-          .upload(fileName, roomImageFile, { contentType: roomImageFile.type });
+          .upload(fileName, file, { contentType: file.type });
         if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
 
         const { data: { publicUrl } } = supabase.storage
           .from('room-images')
           .getPublicUrl(fileName);
-        imageUrl = publicUrl;
+        uploadedUrls.push(publicUrl);
       }
 
       const payload: any = {
@@ -267,18 +364,39 @@ export default function AdminPanel() {
         location: roomLocation || null,
         capacity: roomCapacity ? Number(roomCapacity) : null,
       };
-      if (imageUrl) payload.image_url = imageUrl;
+
+      let roomId = editingRoomId;
 
       if (editingRoomId) {
+        // Editing: cover photo stays as-is here — every newly uploaded photo joins the gallery.
         const { error: updateError } = await supabase.from('rooms').update(payload).eq('id', editingRoomId);
         if (updateError) throw new Error(updateError.message);
-        showToast('Room detail updated!');
       } else {
-        const { error: insertError } = await supabase.from('rooms').insert(payload);
+        // Creating: the first uploaded photo becomes the cover.
+        payload.image_url = uploadedUrls[0];
+        const { data: inserted, error: insertError } = await supabase
+          .from('rooms')
+          .insert(payload)
+          .select()
+          .single();
         if (insertError) throw new Error(insertError.message);
-        showToast('Room detail added!');
+        roomId = inserted.id;
       }
 
+      const extraUrls = editingRoomId ? uploadedUrls : uploadedUrls.slice(1);
+      if (roomId && extraUrls.length > 0) {
+        let position = editingRoomId ? galleryImages.length : 0;
+        for (const url of extraUrls) {
+          const { error: galleryInsertError } = await supabase.from('room_images').insert({
+            room_id: roomId,
+            image_url: url,
+            position: position++,
+          });
+          if (galleryInsertError) throw new Error(galleryInsertError.message);
+        }
+      }
+
+      showToast(editingRoomId ? 'Room detail updated!' : 'Room detail added!');
       resetRoomForm();
       fetchRooms();
     } catch (err: any) {
@@ -577,7 +695,7 @@ export default function AdminPanel() {
   if (!authChecked) {
     return (
       <div style={{
-        minHeight: '100vh', background: '#0a0a0f', color: '#4d9e7f',
+        minHeight: '100vh', background: '#0a1420', color: '#38bdf8',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontFamily: "'DM Mono', 'Courier New', monospace", fontSize: '0.85rem', letterSpacing: '0.1em',
       }}>
@@ -591,17 +709,17 @@ export default function AdminPanel() {
   }
 
   return (
-    <div onClick={handleAdminPanelClick} style={{ minHeight: '100vh', background: '#0a0a0f', color: '#e8e6e0', fontFamily: "'DM Mono', 'Courier New', monospace" }}>
+    <div onClick={handleAdminPanelClick} style={{ minHeight: '100vh', background: '#0a1420', color: '#e8e6e0', fontFamily: "'DM Mono', 'Courier New', monospace" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Playfair+Display:wght@700;900&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #0a0a0f; }
-        ::-webkit-scrollbar-thumb { background: #3a6b5a; border-radius: 2px; }
+        ::-webkit-scrollbar-track { background: #0a1420; }
+        ::-webkit-scrollbar-thumb { background: #0ea5e9; border-radius: 2px; }
 
         .panel-header {
-          background: linear-gradient(135deg, #0d1f1a 0%, #0a0a0f 100%);
-          border-bottom: 1px solid #1e3d32;
+          background: linear-gradient(135deg, #152538 0%, #0a1420 100%);
+          border-bottom: 1px solid #0284c7;
           padding: 1rem 1.25rem;
           display: flex;
           align-items: center;
@@ -610,12 +728,12 @@ export default function AdminPanel() {
           top: 0;
           z-index: 100;
         }
-        .logo { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 900; background: linear-gradient(135deg, #4d9e7f, #a8d5be); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .logo span { font-weight: 300; font-size: 0.75rem; display: block; background: #6b8f82; -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 0.15em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4d9e7f; display: inline-block; margin-right: 0.5rem; box-shadow: 0 0 8px #4d9e7f; animation: pulse 2s infinite; }
+        .logo { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 900; background: linear-gradient(135deg, #38bdf8, #bae6fd); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .logo span { font-weight: 300; font-size: 0.75rem; display: block; background: #7dd3fc; -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 0.15em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; display: inline-block; margin-right: 0.5rem; box-shadow: 0 0 8px #38bdf8; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .status-text { font-size: 0.7rem; color: #4d9e7f; letter-spacing: 0.1em; }
-        .logout-btn { background: transparent; border: 1px solid #1e3d32; color: #4a7a68; font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.08em; padding: 0.4rem 0.7rem; border-radius: 6px; cursor: pointer; margin-left: 0.75rem; transition: all 0.2s; }
+        .status-text { font-size: 0.7rem; color: #38bdf8; letter-spacing: 0.1em; }
+        .logout-btn { background: transparent; border: 1px solid #0284c7; color: #0ea5e9; font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.08em; padding: 0.4rem 0.7rem; border-radius: 6px; cursor: pointer; margin-left: 0.75rem; transition: all 0.2s; }
         .logout-btn:hover { border-color: #8b4444; color: #c47070; }
 
         .hamburger {
@@ -631,7 +749,7 @@ export default function AdminPanel() {
           display: block;
           width: 22px;
           height: 2px;
-          background: #4d9e7f;
+          background: #38bdf8;
           border-radius: 2px;
           transition: all 0.2s;
         }
@@ -639,49 +757,49 @@ export default function AdminPanel() {
         .main-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 60px); }
 
         .sidebar {
-          background: #0d1a16;
-          border-right: 1px solid #1e3d32;
+          background: #0d1b2e;
+          border-right: 1px solid #0284c7;
           padding: 1.5rem 1rem;
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
         }
-        .sidebar-divider { border: none; border-top: 1px solid #1e3d32; margin: 1.25rem 0.25rem; }
-        .sidebar-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #3a6b5a; padding: 0.5rem 0.75rem; margin-top: 0.5rem; }
-        .nav-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 8px; border: none; background: transparent; color: #7a9e90; font-family: 'DM Mono', monospace; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; text-align: left; width: 100%; }
-        .nav-btn:hover { background: #1a3028; color: #a8d5be; }
-        .nav-btn.active { background: #1e3d32; color: #4d9e7f; border-left: 2px solid #4d9e7f; }
+        .sidebar-divider { border: none; border-top: 1px solid #0284c7; margin: 1.25rem 0.25rem; }
+        .sidebar-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #0ea5e9; padding: 0.5rem 0.75rem; margin-top: 0.5rem; }
+        .nav-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 8px; border: none; background: transparent; color: #7dd3fc; font-family: 'DM Mono', monospace; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; text-align: left; width: 100%; }
+        .nav-btn:hover { background: #0369a1; color: #bae6fd; }
+        .nav-btn.active { background: #0284c7; color: #38bdf8; border-left: 2px solid #38bdf8; }
         .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
 
         .content { padding: 1.5rem; overflow-y: auto; }
 
         .section-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; color: #e8e6e0; margin-bottom: 0.25rem; }
-        .section-sub { font-size: 0.7rem; color: #4a7a68; letter-spacing: 0.1em; margin-bottom: 1.5rem; }
+        .section-sub { font-size: 0.7rem; color: #0ea5e9; letter-spacing: 0.1em; margin-bottom: 1.5rem; }
 
-        .card { background: #0d1a16; border: 1px solid #1e3d32; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
-        .card-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #4d9e7f; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+        .card { background: #0d1b2e; border: 1px solid #0284c7; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+        .card-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #38bdf8; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
         .form-group { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
-        .form-label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: #4a7a68; }
-        .form-input { background: #0a0a0f; border: 1px solid #1e3d32; border-radius: 8px; padding: 0.65rem 1rem; color: #e8e6e0; font-family: 'DM Mono', monospace; font-size: 0.85rem; outline: none; transition: border-color 0.2s; width: 100%; }
-        .form-input:focus { border-color: #4d9e7f; }
-        .form-input::placeholder { color: #2a5040; }
-        select.form-input option { background: #0a0a0f; }
+        .form-label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: #0ea5e9; }
+        .form-input { background: #0a1420; border: 1px solid #0284c7; border-radius: 8px; padding: 0.65rem 1rem; color: #e8e6e0; font-family: 'DM Mono', monospace; font-size: 0.85rem; outline: none; transition: border-color 0.2s; width: 100%; }
+        .form-input:focus { border-color: #38bdf8; }
+        .form-input::placeholder { color: #075985; }
+        select.form-input option { background: #0a1420; }
         textarea.form-input { resize: vertical; min-height: 80px; font-family: 'DM Mono', monospace; }
 
-        .file-input-wrapper { position: relative; background: #0a0a0f; border: 1px dashed #1e3d32; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
-        .file-input-wrapper:hover { border-color: #4d9e7f; }
+        .file-input-wrapper { position: relative; background: #0a1420; border: 1px dashed #0284c7; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+        .file-input-wrapper:hover { border-color: #38bdf8; }
         .file-input-wrapper input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-        .file-label { font-size: 0.8rem; color: #4a7a68; }
-        .file-label strong { color: #4d9e7f; }
+        .file-label { font-size: 0.8rem; color: #0ea5e9; }
+        .file-label strong { color: #38bdf8; }
 
         .btn { padding: 0.65rem 1.25rem; border-radius: 8px; border: none; font-family: 'DM Mono', monospace; font-size: 0.78rem; letter-spacing: 0.08em; cursor: pointer; transition: all 0.2s; }
-        .btn-primary { background: #1e3d32; color: #4d9e7f; border: 1px solid #3a6b5a; }
-        .btn-primary:hover { background: #2a5040; color: #a8d5be; }
+        .btn-primary { background: #0284c7; color: #38bdf8; border: 1px solid #0ea5e9; }
+        .btn-primary:hover { background: #075985; color: #bae6fd; }
         .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-secondary { background: transparent; color: #7a9e90; border: 1px solid #1e3d32; }
-        .btn-secondary:hover { background: #1a3028; color: #a8d5be; }
+        .btn-secondary { background: transparent; color: #7dd3fc; border: 1px solid #0284c7; }
+        .btn-secondary:hover { background: #0369a1; color: #bae6fd; }
         .btn-danger { background: transparent; color: #8b4444; border: 1px solid #4a2222; padding: 0.4rem 0.7rem; font-size: 0.72rem; }
         .btn-danger:hover { background: #2a1010; color: #c47070; border-color: #8b4444; }
         .btn-accent { background: transparent; color: #7a6a2a; border: 1px solid #4a3a10; padding: 0.4rem 0.7rem; font-size: 0.72rem; }
@@ -693,67 +811,67 @@ export default function AdminPanel() {
         .editing-badge { font-size: 0.62rem; background: #1a1030; color: #9d7fd4; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.1em; }
 
         .panorama-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
-        .panorama-card { background: #0a0a0f; border: 1px solid #1e3d32; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; cursor: pointer; }
-        .panorama-card:hover { border-color: #3a6b5a; }
-        .panorama-card.selected { border-color: #4d9e7f; }
-        .panorama-img { width: 100%; height: 120px; object-fit: cover; display: block; background: #0d1a16; }
+        .panorama-card { background: #0a1420; border: 1px solid #0284c7; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; cursor: pointer; }
+        .panorama-card:hover { border-color: #0ea5e9; }
+        .panorama-card.selected { border-color: #38bdf8; }
+        .panorama-img { width: 100%; height: 120px; object-fit: cover; display: block; background: #0d1b2e; }
         .panorama-info { padding: 0.65rem 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; flex-wrap: wrap; }
-        .panorama-title { font-size: 0.78rem; color: #a8c8b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+        .panorama-title { font-size: 0.78rem; color: #7dd3fc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
 
         .hotspot-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
-        .hotspot-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem; border-radius: 8px; border: 1px solid #1e3d32; background: #0a0a0f; font-size: 0.78rem; }
+        .hotspot-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem; border-radius: 8px; border: 1px solid #0284c7; background: #0a1420; font-size: 0.78rem; }
         .hotspot-item-info { display: flex; flex-direction: column; gap: 0.3rem; flex: 1; min-width: 0; }
         .hotspot-badge { font-size: 0.62rem; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.1em; display: inline-block; }
-        .hotspot-badge.scene { background: #1e3d32; color: #4d9e7f; }
+        .hotspot-badge.scene { background: #0284c7; color: #38bdf8; }
         .hotspot-badge.info { background: #1a1030; color: #9d7fd4; }
-        .hotspot-badge.linked { background: #1e3d32; color: #4d9e7f; }
+        .hotspot-badge.linked { background: #0284c7; color: #38bdf8; }
         .hotspot-badge.unlinked { background: #2a1010; color: #c47070; }
 
-        .empty-state { text-align: center; padding: 2.5rem 1rem; color: #2a5040; font-size: 0.82rem; }
+        .empty-state { text-align: center; padding: 2.5rem 1rem; color: #075985; font-size: 0.82rem; }
         .empty-icon { font-size: 2rem; margin-bottom: 0.75rem; }
 
         .toast { position: fixed; bottom: 1.5rem; right: 1rem; left: 1rem; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.78rem; letter-spacing: 0.05em; z-index: 999; animation: slideUp 0.3s ease; text-align: center; }
-        .toast.success { background: #1e3d32; color: #4d9e7f; border: 1px solid #3a6b5a; }
+        .toast.success { background: #0284c7; color: #38bdf8; border: 1px solid #0ea5e9; }
         .toast.error { background: #2a1010; color: #c47070; border: 1px solid #4a2222; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
-        .stat-card { background: #0d1a16; border: 1px solid #1e3d32; border-radius: 10px; padding: 0.85rem 1rem; }
-        .stat-num { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: #4d9e7f; font-weight: 700; }
-        .stat-label { font-size: 0.62rem; color: #4a7a68; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 0.15rem; }
+        .stat-card { background: #0d1b2e; border: 1px solid #0284c7; border-radius: 10px; padding: 0.85rem 1rem; }
+        .stat-num { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: #38bdf8; font-weight: 700; }
+        .stat-label { font-size: 0.62rem; color: #0ea5e9; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 0.15rem; }
 
-        .info-box { background: #0a0f1a; border: 1px solid #1e2d5a; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.73rem; color: #5a7ab8; margin-bottom: 1rem; line-height: 1.6; }
+        .info-box { background: #0a0f1a; border: 1px solid #0284c7; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.73rem; color: #38bdf8; margin-bottom: 1rem; line-height: 1.6; }
 
-        .click-image-wrapper { position: relative; width: 100%; border-radius: 8px; overflow: hidden; cursor: crosshair; border: 1px solid #1e3d32; transition: border-color 0.2s; background: #0a0a0f; user-select: none; }
-        .click-image-wrapper:hover { border-color: #4d9e7f; }
+        .click-image-wrapper { position: relative; width: 100%; border-radius: 8px; overflow: hidden; cursor: crosshair; border: 1px solid #0284c7; transition: border-color 0.2s; background: #0a1420; user-select: none; }
+        .click-image-wrapper:hover { border-color: #38bdf8; }
         .click-image-wrapper img { width: 100%; display: block; pointer-events: none; }
         .crosshair-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: rgba(255,255,255,0.35); letter-spacing: 0.15em; text-transform: uppercase; pointer-events: none; transition: opacity 0.2s; }
         .click-image-wrapper:hover .crosshair-label { opacity: 0; }
         .click-marker { position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
-        .click-marker-ring { width: 28px; height: 28px; border: 2px solid #4d9e7f; border-radius: 50%; animation: markerPop 0.2s ease; }
-        .click-marker-dot { width: 6px; height: 6px; background: #4d9e7f; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .click-marker-ring { width: 28px; height: 28px; border: 2px solid #38bdf8; border-radius: 50%; animation: markerPop 0.2s ease; }
+        .click-marker-dot { width: 6px; height: 6px; background: #38bdf8; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         @keyframes markerPop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
         /* existing (already-saved) pins shown on the denah while placing/editing a new one */
         .existing-pin { position: absolute; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; }
-        .existing-pin-dot { width: 16px; height: 16px; border-radius: 50%; background: #c4a840; border: 2px solid #0a0a0f; box-shadow: 0 0 0 2px #c4a840; }
+        .existing-pin-dot { width: 16px; height: 16px; border-radius: 50%; background: #c4a840; border: 2px solid #0a1420; box-shadow: 0 0 0 2px #c4a840; }
 
-        .coord-readout { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; padding: 0.65rem 1rem; background: #0a0a0f; border: 1px solid #1e3d32; border-radius: 8px; font-size: 0.78rem; align-items: center; }
-        .coord-empty { color: #2a5040; font-size: 0.72rem; letter-spacing: 0.05em; }
+        .coord-readout { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; padding: 0.65rem 1rem; background: #0a1420; border: 1px solid #0284c7; border-radius: 8px; font-size: 0.78rem; align-items: center; }
+        .coord-empty { color: #075985; font-size: 0.72rem; letter-spacing: 0.05em; }
         .coord-pill { display: flex; align-items: center; gap: 0.5rem; }
-        .coord-key { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.15em; color: #3a6b5a; }
-        .coord-val { color: #a8d5be; font-size: 0.82rem; }
-        .coord-divider { width: 1px; height: 14px; background: #1e3d32; }
+        .coord-key { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.15em; color: #0ea5e9; }
+        .coord-val { color: #bae6fd; font-size: 0.82rem; }
+        .coord-divider { width: 1px; height: 14px; background: #0284c7; }
 
         .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
-        .room-card { background: #0a0a0f; border: 1px solid #1e3d32; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; }
-        .room-card:hover { border-color: #3a6b5a; }
+        .room-card { background: #0a1420; border: 1px solid #0284c7; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; }
+        .room-card:hover { border-color: #0ea5e9; }
         .room-card.editing { border-color: #4a6a9e; }
-        .room-img { width: 100%; height: 120px; object-fit: cover; display: block; background: #0d1a16; }
+        .room-img { width: 100%; height: 120px; object-fit: cover; display: block; background: #0d1b2e; }
         .room-info { padding: 0.65rem 0.75rem; }
-        .room-name { font-size: 0.82rem; color: #a8c8b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.3rem; }
-        .room-meta { font-size: 0.65rem; color: #3a6b5a; margin-bottom: 0.5rem; }
-        .room-desc { font-size: 0.7rem; color: #6b8f82; line-height: 1.5; margin-bottom: 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .room-name { font-size: 0.82rem; color: #7dd3fc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.3rem; }
+        .room-meta { font-size: 0.65rem; color: #0ea5e9; margin-bottom: 0.5rem; }
+        .room-desc { font-size: 0.7rem; color: #7dd3fc; line-height: 1.5; margin-bottom: 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .room-actions { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; }
 
         .bottom-tab-bar { display: none; }
@@ -793,8 +911,8 @@ export default function AdminPanel() {
             bottom: 0;
             left: 0;
             right: 0;
-            background: #0d1a16;
-            border-top: 1px solid #1e3d32;
+            background: #0d1b2e;
+            border-top: 1px solid #0284c7;
             z-index: 80;
           }
           .bottom-tab-btn {
@@ -807,14 +925,14 @@ export default function AdminPanel() {
             padding: 0.65rem 0.5rem;
             background: transparent;
             border: none;
-            color: #4a7a68;
+            color: #0ea5e9;
             font-family: 'DM Mono', monospace;
             font-size: 0.65rem;
             letter-spacing: 0.08em;
             cursor: pointer;
             transition: color 0.2s;
           }
-          .bottom-tab-btn.active { color: #4d9e7f; border-top: 2px solid #4d9e7f; }
+          .bottom-tab-btn.active { color: #38bdf8; border-top: 2px solid #38bdf8; }
           .bottom-tab-icon { font-size: 1.2rem; }
 
           .form-row { grid-template-columns: 1fr; }
@@ -866,8 +984,8 @@ export default function AdminPanel() {
 
           <div className="sidebar-label" style={{ marginTop: '2rem' }}>Selected Panorama</div>
           {selectedPanorama
-            ? <div style={{ padding: '0.5rem 1rem', background: '#1a1e3d', borderRadius: '8px', fontSize: '0.78rem', color: '#a8b8d5' }}>🌐 {selectedPanorama.title || `ID: ${selectedPanorama.id}`}</div>
-            : <div style={{ padding: '0.5rem 1rem', fontSize: '0.72rem', color: '#2a5040' }}>None selected</div>}
+            ? <div style={{ padding: '0.5rem 1rem', background: '#0c4a6e', borderRadius: '8px', fontSize: '0.78rem', color: '#7dd3fc' }}>🌐 {selectedPanorama.title || `ID: ${selectedPanorama.id}`}</div>
+            : <div style={{ padding: '0.5rem 1rem', fontSize: '0.72rem', color: '#075985' }}>None selected</div>}
 
           <hr className="sidebar-divider" />
 
@@ -897,7 +1015,7 @@ export default function AdminPanel() {
           {!locationId && (
             <div className="card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
               <div className="empty-icon" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📍</div>
-              <p style={{ color: '#4a7a68', marginBottom: '1rem', fontSize: '0.82rem' }}>No locations yet. Create one to start adding panoramas.</p>
+              <p style={{ color: '#0ea5e9', marginBottom: '1rem', fontSize: '0.82rem' }}>No locations yet. Create one to start adding panoramas.</p>
               <button className="btn btn-primary" onClick={createDefaultLocation}>+ Create Location</button>
             </div>
           )}
@@ -949,7 +1067,7 @@ export default function AdminPanel() {
                       <div key={pan.id} className={`panorama-card ${selectedPanorama?.id === pan.id ? 'selected' : ''}`}
                         onClick={() => { setSelectedPanorama(pan); setActiveTab('hotspots'); }}>
                         <img className="panorama-img" src={pan.image_url} alt={pan.title}
-                          onError={(e: any) => { e.target.src = ''; e.target.style.background = '#1e3d32'; }} />
+                          onError={(e: any) => { e.target.src = ''; e.target.style.background = '#0284c7'; }} />
                         <div className="panorama-info">
                           <span className="panorama-title">{pan.title || 'Untitled'}</span>
                           <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -961,7 +1079,7 @@ export default function AdminPanel() {
                             <button className="btn btn-danger" onClick={e => { e.stopPropagation(); handleDeletePanorama(pan.id); }}>Del</button>
                           </div>
                         </div>
-                        <div style={{ padding: '0 0.75rem 0.5rem', fontSize: '0.62rem', color: '#3a6b5a' }}>ID: {pan.id}</div>
+                        <div style={{ padding: '0 0.75rem 0.5rem', fontSize: '0.62rem', color: '#0ea5e9' }}>ID: {pan.id}</div>
                       </div>
                     ))}
                   </div>}
@@ -1064,10 +1182,10 @@ export default function AdminPanel() {
                             <div className="hotspot-item-info">
                               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                 <span className={`hotspot-badge ${hs.type}`}>{hs.type.toUpperCase()}</span>
-                                <span style={{ color: '#c8d8d0', fontSize: '0.8rem' }}>{hs.text || '(no label)'}</span>
+                                <span style={{ color: '#bae6fd', fontSize: '0.8rem' }}>{hs.text || '(no label)'}</span>
                               </div>
-                              <span style={{ color: '#3a6b5a', fontSize: '0.68rem' }}>pitch: {hs.pitch} | yaw: {hs.yaw}</span>
-                              {hs.type === 'scene' && <span style={{ color: '#4a7a68', fontSize: '0.68rem' }}>→ Panorama ID: {hs.target_panorama_id}</span>}
+                              <span style={{ color: '#0ea5e9', fontSize: '0.68rem' }}>pitch: {hs.pitch} | yaw: {hs.yaw}</span>
+                              {hs.type === 'scene' && <span style={{ color: '#0ea5e9', fontSize: '0.68rem' }}>→ Panorama ID: {hs.target_panorama_id}</span>}
                             </div>
                             <button className="btn btn-danger" onClick={() => handleDeleteHotspot(hs.id)}>Delete</button>
                           </div>
@@ -1088,7 +1206,7 @@ export default function AdminPanel() {
                 💡 Upload a photo and fill in the info below. This feeds the room detail page visitors see when they tap an area on the denah.
               </div>
 
-              {/* ── Add / Edit room form ── */}
+              {/* ── Add / Edit room form (photos picked below, before confirming) ── */}
               <div className="card">
                 <div className="card-title">
                   <span>{editingRoomId ? `// Editing Room #${editingRoomId}` : '// Add Room Detail'}</span>
@@ -1100,33 +1218,17 @@ export default function AdminPanel() {
                     <input className="form-input" placeholder="e.g. Ruang RPL 1" value={roomName} onChange={e => setRoomName(e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">
-                      Photo {editingRoomId ? '(kosongkan jika tidak diganti)' : ''}
-                    </label>
-                    <div className="file-input-wrapper" onClick={() => roomFileInputRef.current?.click()}>
-                      <input
-                        ref={roomFileInputRef}
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={e => setRoomImageFile(e.target.files?.[0] || null)}
-                      />
-                      <div className="file-label">
-                        {roomImageFile ? <strong>{roomImageFile.name}</strong> : <><strong>Pilih gambar</strong> atau tap di sini</>}
-                      </div>
-                    </div>
+                    <label className="form-label">Location (optional)</label>
+                    <input className="form-input" placeholder="e.g. Lantai 2, Gedung A" value={roomLocation} onChange={e => setRoomLocation(e.target.value)} />
                   </div>
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">Location (optional)</label>
-                    <input className="form-input" placeholder="e.g. Lantai 2, Gedung A" value={roomLocation} onChange={e => setRoomLocation(e.target.value)} />
-                  </div>
-                  <div className="form-group">
                     <label className="form-label">Capacity (optional)</label>
                     <input className="form-input" type="number" placeholder="e.g. 36" value={roomCapacity} onChange={e => setRoomCapacity(e.target.value)} />
                   </div>
+                  <div className="form-group" />
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '1rem' }}>
@@ -1139,11 +1241,92 @@ export default function AdminPanel() {
                   />
                 </div>
 
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">
+                    {editingRoomId ? 'Tambah Foto (opsional)' : 'Foto Ruangan (bisa pilih lebih dari 1 — foto pertama otomatis jadi cover)'}
+                  </label>
+                  <div className="file-input-wrapper" onClick={() => galleryFileInputRef.current?.click()}>
+                    <input
+                      ref={galleryFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const picked = e.target.files ? Array.from(e.target.files) : [];
+                        setGalleryFiles(prev => [...prev, ...picked]);
+                        e.target.value = ''; // allow picking the same file again later
+                      }}
+                    />
+                    <div className="file-label">
+                      <strong>Pilih gambar</strong> atau tap di sini — bisa pilih beberapa sekaligus
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.68rem', color: '#0ea5e9' }}>
+                    Foto diupload saat kamu tekan Save/Add di bawah. Selama belum ditekan, foto masih bisa ditambah atau dibatalkan lewat preview di bawah ini. Kalau totalnya lebih dari 1 foto, halaman publik otomatis nampilin carousel.
+                  </span>
+                </div>
+
+                {/* Carousel preview — mirrors exactly what the public Detail Ruangan page will show */}
+                {roomPreviewSlides.length > 0 && (
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label className="form-label">Preview Carousel (tampilan di Detail Ruangan)</label>
+                    <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', border: '1px solid #0284c7', background: '#0a1420' }}>
+                      <img
+                        src={roomPreviewSlides[previewSlideIndex]?.url}
+                        alt={roomPreviewSlides[previewSlideIndex]?.label}
+                        style={{ width: '100%', height: 'clamp(260px, 45vw, 460px)', objectFit: 'contain', display: 'block', background: '#000' }}
+                      />
+                      {roomPreviewSlides.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewSlideIndex(i => (i - 1 + roomPreviewSlides.length) % roomPreviewSlides.length)}
+                            style={{ position: 'absolute', top: '50%', left: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(10,10,15,0.7)', color: '#38bdf8', border: '1px solid #0284c7', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
+                          >‹</button>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewSlideIndex(i => (i + 1) % roomPreviewSlides.length)}
+                            style={{ position: 'absolute', top: '50%', right: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(10,10,15,0.7)', color: '#38bdf8', border: '1px solid #0284c7', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
+                          >›</button>
+                        </>
+                      )}
+                      <div style={{ position: 'absolute', bottom: '0.6rem', left: '0.6rem', background: 'rgba(10,10,15,0.75)', color: '#bae6fd', fontSize: '0.68rem', padding: '0.25rem 0.6rem', borderRadius: '4px', letterSpacing: '0.05em' }}>
+                        {roomPreviewSlides[previewSlideIndex]?.label} · {previewSlideIndex + 1}/{roomPreviewSlides.length}
+                      </div>
+                    </div>
+
+                    {roomPreviewSlides.length > 1 && (
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', marginTop: '0.7rem' }}>
+                        {roomPreviewSlides.map((s, i) => (
+                          <button
+                            key={s.key}
+                            type="button"
+                            onClick={() => setPreviewSlideIndex(i)}
+                            aria-label={`Slide ${i + 1}`}
+                            style={{ width: '9px', height: '9px', padding: 0, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === previewSlideIndex ? '#38bdf8' : '#0284c7' }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {roomPreviewSlides[previewSlideIndex]?.onDelete && (
+                      <button
+                        className="btn btn-danger"
+                        style={{ width: '100%', marginTop: '0.6rem' }}
+                        onClick={roomPreviewSlides[previewSlideIndex]?.onDelete}
+                      >
+                        Hapus Foto Ini
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
                     className="btn btn-primary"
                     onClick={handleSaveRoom}
-                    disabled={roomLoading || !roomName.trim() || (!editingRoomId && !roomImageFile)}
+                    disabled={roomLoading || !roomName.trim() || (!editingRoomId && galleryFiles.length === 0)}
                     style={{ flex: 1 }}
                   >
                     {roomLoading ? 'Saving...' : editingRoomId ? '✓ Save Changes' : '+ Add Room Detail'}
@@ -1163,7 +1346,7 @@ export default function AdminPanel() {
                     {rooms.map((room: any) => (
                       <div key={room.id} className={`room-card ${editingRoomId === room.id ? 'editing' : ''}`}>
                         <img className="room-img" src={room.image_url} alt={room.name}
-                          onError={(e: any) => { e.target.src = ''; e.target.style.background = '#1e3d32'; }} />
+                          onError={(e: any) => { e.target.src = ''; e.target.style.background = '#0284c7'; }} />
                         <div className="room-info">
                           <div className="room-name">{room.name}</div>
                           <div className="room-meta">
@@ -1171,7 +1354,7 @@ export default function AdminPanel() {
                           </div>
                           {room.description && <div className="room-desc">{room.description}</div>}
                           <div className="room-actions">
-                            <span style={{ fontSize: '0.62rem', color: '#3a6b5a' }}>ID: {room.id}</span>
+                            <span style={{ fontSize: '0.62rem', color: '#0ea5e9' }}>ID: {room.id}</span>
                             <div style={{ display: 'flex', gap: '0.4rem' }}>
                               <button className="btn btn-edit" onClick={() => handleEditRoomClick(room)}>Edit</button>
                               <button className="btn btn-danger" onClick={() => handleDeleteRoom(room.id)}>Del</button>
@@ -1287,10 +1470,10 @@ export default function AdminPanel() {
                               <span className={`hotspot-badge ${linkedRoom ? 'linked' : 'unlinked'}`}>
                                 {linkedRoom ? 'TERHUBUNG' : 'BELUM TERHUBUNG'}
                               </span>
-                              <span style={{ color: '#c8d8d0', fontSize: '0.8rem' }}>{pin.label}</span>
+                              <span style={{ color: '#bae6fd', fontSize: '0.8rem' }}>{pin.label}</span>
                             </div>
-                            <span style={{ color: '#3a6b5a', fontSize: '0.68rem' }}>x: {pin.map_x}% | y: {pin.map_y}%</span>
-                            {linkedRoom && <span style={{ color: '#4a7a68', fontSize: '0.68rem' }}>→ {linkedRoom.name}</span>}
+                            <span style={{ color: '#0ea5e9', fontSize: '0.68rem' }}>x: {pin.map_x}% | y: {pin.map_y}%</span>
+                            {linkedRoom && <span style={{ color: '#0ea5e9', fontSize: '0.68rem' }}>→ {linkedRoom.name}</span>}
                           </div>
                           <div style={{ display: 'flex', gap: '0.4rem' }}>
                             <button className="btn btn-edit" onClick={() => handleEditPinClick(pin)}>Edit</button>
