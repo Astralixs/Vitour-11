@@ -113,7 +113,7 @@ export default function AdminPanel() {
       console.warn(`[validateSession:${source}] Account no longer valid, logging out.`, error);
       await supabase.auth.signOut();
       setSession(null);
-      showToast('Your session has ended — account no longer exists or was signed out.', 'error');
+      showToast('Sesi kamu telah berakhir — akun sudah tidak ada atau telah keluar.', 'error');
     }
   };
 
@@ -154,12 +154,12 @@ export default function AdminPanel() {
         if (data.length > 0) {
           setLocationId(data[0].id);
         } else {
-          showToast('No location found in database!', 'error');
+          showToast('Lokasi tidak ditemukan di database!', 'error');
         }
       })
       .catch(err => {
         console.error('[fetchLocations] FULL ERROR:', err);
-        showToast(`Failed to fetch locations: ${err.message}`, 'error');
+        showToast(`Gagal mengambil data lokasi: ${err.message}`, 'error');
       });
   }, [session]);
 
@@ -196,10 +196,10 @@ export default function AdminPanel() {
       if (!res.ok) throw new Error(`Create location failed: ${res.status} ${res.statusText}`);
       const loc = await res.json();
       setLocationId(loc.id);
-      showToast('Location created!');
+      showToast('Lokasi berhasil dibuat!');
     } catch (err: any) {
       console.error('[createDefaultLocation] FULL ERROR:', err);
-      showToast(`Failed to create location: ${err.message}`, 'error');
+      showToast(`Gagal membuat lokasi: ${err.message}`, 'error');
     }
   };
 
@@ -208,7 +208,7 @@ export default function AdminPanel() {
       setPanoramas(await getPanoramas(id));
     } catch (err: any) {
       console.error('[fetchPanoramas] FULL ERROR:', err);
-      showToast(`Failed to fetch panoramas: ${err.message}`, 'error');
+      showToast(`Gagal mengambil data panorama: ${err.message}`, 'error');
     }
   };
 
@@ -219,7 +219,7 @@ export default function AdminPanel() {
       setHotspots(await res.json());
     } catch (err: any) {
       console.error('[fetchHotspots] FULL ERROR:', err);
-      showToast(`Failed to fetch hotspots: ${err.message}`, 'error');
+      showToast(`Gagal mengambil data hotspot: ${err.message}`, 'error');
     }
   };
 
@@ -234,7 +234,7 @@ export default function AdminPanel() {
       setRooms(data || []);
     } catch (err: any) {
       console.error('[fetchRooms] FULL ERROR:', err);
-      showToast(`Failed to fetch room details: ${err.message}`, 'error');
+      showToast(`Gagal mengambil detail ruangan: ${err.message}`, 'error');
     }
   };
 
@@ -273,7 +273,7 @@ export default function AdminPanel() {
       setGalleryImages(data || []);
     } catch (err: any) {
       console.error('[fetchGalleryImages] FULL ERROR:', err);
-      showToast(`Failed to fetch gallery photos: ${err.message}`, 'error');
+      showToast(`Gagal mengambil foto galeri: ${err.message}`, 'error');
     }
   };
 
@@ -338,8 +338,8 @@ export default function AdminPanel() {
   // Handles BOTH creating a new room and saving edits to an existing one.
   // All photos are picked through the single multi-file input above, uploaded together here.
   const handleSaveRoom = async () => {
-    if (!roomName.trim()) { showToast('Please enter a room name', 'error'); return; }
-    if (!editingRoomId && galleryFiles.length === 0) { showToast('Please select at least one photo', 'error'); return; }
+    if (!roomName.trim()) { showToast('Silakan isi nama ruangan', 'error'); return; }
+    if (!editingRoomId && galleryFiles.length === 0) { showToast('Silakan pilih minimal satu foto', 'error'); return; }
 
     setRoomLoading(true);
     try {
@@ -396,12 +396,12 @@ export default function AdminPanel() {
         }
       }
 
-      showToast(editingRoomId ? 'Room detail updated!' : 'Room detail added!');
+      showToast(editingRoomId ? 'Detail ruangan berhasil diperbarui!' : 'Detail ruangan berhasil ditambahkan!');
       resetRoomForm();
       fetchRooms();
     } catch (err: any) {
       console.error('[handleSaveRoom] FULL ERROR:', err);
-      showToast(`Failed to save room: ${err.message || err}`, 'error');
+      showToast(`Gagal menyimpan ruangan: ${err.message || err}`, 'error');
     }
     setRoomLoading(false);
   };
@@ -425,10 +425,10 @@ export default function AdminPanel() {
 
       if (editingRoomId === id) resetRoomForm();
       fetchRooms();
-      showToast('Room detail deleted!');
+      showToast('Detail ruangan berhasil dihapus!');
     } catch (err: any) {
       console.error('[handleDeleteRoom] FULL ERROR:', err);
-      showToast(`Failed to delete room: ${err.message}`, 'error');
+      showToast(`Gagal menghapus ruangan: ${err.message}`, 'error');
     }
   };
 
@@ -443,7 +443,7 @@ export default function AdminPanel() {
       setPins(data || []);
     } catch (err: any) {
       console.error('[fetchPins] FULL ERROR:', err);
-      showToast(`Failed to fetch map pins: ${err.message}`, 'error');
+      showToast(`Gagal mengambil pin peta: ${err.message}`, 'error');
     }
   };
 
@@ -524,8 +524,8 @@ export default function AdminPanel() {
   };
 
   const handleAddPanorama = async () => {
-    if (!imageFile) { showToast('Please select an image', 'error'); return; }
-    if (!locationId) { showToast('No location found — create one first', 'error'); return; }
+    if (!imageFile) { showToast('Silakan pilih gambar', 'error'); return; }
+    if (!locationId) { showToast('Lokasi tidak ditemukan — buat dulu', 'error'); return; }
     setLoading(true);
     try {
       const fileExt = imageFile.name.split('.').pop();
@@ -554,10 +554,10 @@ export default function AdminPanel() {
 
       setPanoramaTitle(''); setImageFile(null);
       fetchPanoramas(locationId);
-      showToast('Panorama uploaded!');
+      showToast('Panorama berhasil diupload!');
     } catch (err: any) {
       console.error('[handleAddPanorama] FULL ERROR:', err);
-      showToast(`Failed to upload panorama: ${err.message || err}`, 'error');
+      showToast(`Gagal mengupload panorama: ${err.message || err}`, 'error');
     }
     setLoading(false);
   };
@@ -626,10 +626,10 @@ export default function AdminPanel() {
 
       if (selectedPanorama?.id === id) { setSelectedPanorama(null); setHotspots([]); }
       if (locationId) fetchPanoramas(locationId);
-      showToast('Panorama, image, and related hotspots deleted!');
+      showToast('Panorama, gambar, dan hotspot terkait berhasil dihapus!');
     } catch (err: any) {
       console.error('[handleDeletePanorama] FULL ERROR:', err);
-      showToast(`Failed to delete panorama: ${err.message}`, 'error');
+      showToast(`Gagal menghapus panorama: ${err.message}`, 'error');
     }
   };
 
@@ -644,10 +644,10 @@ export default function AdminPanel() {
         if (!res.ok) throw new Error(`Update failed for panorama ${pan.id}: ${res.status} ${res.statusText}`);
       }
       if (locationId) fetchPanoramas(locationId);
-      showToast('First scene updated!');
+      showToast('Scene pertama berhasil diperbarui!');
     } catch (err: any) {
       console.error('[handleSetFirstScene] FULL ERROR:', err);
-      showToast(`Failed to set first scene: ${err.message}`, 'error');
+      showToast(`Gagal mengatur scene pertama: ${err.message}`, 'error');
     }
   };
 
@@ -671,10 +671,10 @@ export default function AdminPanel() {
       setHsPitch(''); setHsYaw(''); setHsText(''); setHsTargetId('');
       setClickMarker(null);
       fetchHotspots(selectedPanorama.id);
-      showToast('Hotspot added!');
+      showToast('Hotspot berhasil ditambahkan!');
     } catch (err: any) {
       console.error('[handleAddHotspot] FULL ERROR:', err);
-      showToast(`Failed to add hotspot: ${err.message}`, 'error');
+      showToast(`Gagal menambahkan hotspot: ${err.message}`, 'error');
     }
     setLoading(false);
   };
@@ -684,10 +684,10 @@ export default function AdminPanel() {
       const res = await fetch(`${BASE_URL}/api/hotspots/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`Delete hotspot failed: ${res.status} ${res.statusText}`);
       if (selectedPanorama) fetchHotspots(selectedPanorama.id);
-      showToast('Hotspot deleted!');
+      showToast('Hotspot berhasil dihapus!');
     } catch (err: any) {
       console.error('[handleDeleteHotspot] FULL ERROR:', err);
-      showToast(`Failed to delete hotspot: ${err.message}`, 'error');
+      showToast(`Gagal menghapus hotspot: ${err.message}`, 'error');
     }
   };
 
@@ -695,11 +695,11 @@ export default function AdminPanel() {
   if (!authChecked) {
     return (
       <div style={{
-        minHeight: '100vh', background: '#0a1420', color: '#38bdf8',
+        minHeight: '100vh', background: '#0a1420', color: '#00b8ff',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontFamily: "'DM Mono', 'Courier New', monospace", fontSize: '0.85rem', letterSpacing: '0.1em',
       }}>
-        LOADING...
+        MEMUAT...
       </div>
     );
   }
@@ -713,13 +713,14 @@ export default function AdminPanel() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Playfair+Display:wght@700;900&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        button, input, select, textarea, a, div[tabindex] { outline: none; -webkit-tap-highlight-color: transparent; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #0a1420; }
-        ::-webkit-scrollbar-thumb { background: #0ea5e9; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb { background: #0095e8; border-radius: 2px; }
 
         .panel-header {
           background: linear-gradient(135deg, #152538 0%, #0a1420 100%);
-          border-bottom: 1px solid #0284c7;
+          border-bottom: 1px solid #0077cc;
           padding: 1rem 1.25rem;
           display: flex;
           align-items: center;
@@ -728,12 +729,12 @@ export default function AdminPanel() {
           top: 0;
           z-index: 100;
         }
-        .logo { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 900; background: linear-gradient(135deg, #38bdf8, #bae6fd); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .logo span { font-weight: 300; font-size: 0.75rem; display: block; background: #7dd3fc; -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 0.15em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; display: inline-block; margin-right: 0.5rem; box-shadow: 0 0 8px #38bdf8; animation: pulse 2s infinite; }
+        .logo { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 900; background: linear-gradient(135deg, #00b8ff, #a0e0ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .logo span { font-weight: 300; font-size: 0.75rem; display: block; background: #5dd0ff; -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 0.15em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #00b8ff; display: inline-block; margin-right: 0.5rem; box-shadow: 0 0 8px #00b8ff; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .status-text { font-size: 0.7rem; color: #38bdf8; letter-spacing: 0.1em; }
-        .logout-btn { background: transparent; border: 1px solid #0284c7; color: #0ea5e9; font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.08em; padding: 0.4rem 0.7rem; border-radius: 6px; cursor: pointer; margin-left: 0.75rem; transition: all 0.2s; }
+        .status-text { font-size: 0.7rem; color: #00b8ff; letter-spacing: 0.1em; }
+        .logout-btn { background: transparent; border: 1px solid #0077cc; color: #0095e8; font-family: 'DM Mono', monospace; font-size: 0.68rem; letter-spacing: 0.08em; padding: 0.4rem 0.7rem; border-radius: 6px; cursor: pointer; margin-left: 0.75rem; transition: all 0.2s; }
         .logout-btn:hover { border-color: #8b4444; color: #c47070; }
 
         .hamburger {
@@ -749,7 +750,7 @@ export default function AdminPanel() {
           display: block;
           width: 22px;
           height: 2px;
-          background: #38bdf8;
+          background: #00b8ff;
           border-radius: 2px;
           transition: all 0.2s;
         }
@@ -758,48 +759,47 @@ export default function AdminPanel() {
 
         .sidebar {
           background: #0d1b2e;
-          border-right: 1px solid #0284c7;
+          border-right: 1px solid #0077cc;
           padding: 1.5rem 1rem;
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
         }
-        .sidebar-divider { border: none; border-top: 1px solid #0284c7; margin: 1.25rem 0.25rem; }
-        .sidebar-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #0ea5e9; padding: 0.5rem 0.75rem; margin-top: 0.5rem; }
-        .nav-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 8px; border: none; background: transparent; color: #7dd3fc; font-family: 'DM Mono', monospace; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; text-align: left; width: 100%; }
-        .nav-btn:hover { background: #0369a1; color: #bae6fd; }
-        .nav-btn.active { background: #0284c7; color: #38bdf8; border-left: 2px solid #38bdf8; }
-        .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+        .sidebar-divider { border: none; border-top: 1px solid #0077cc; margin: 1.25rem 0.25rem; }
+        .sidebar-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #0095e8; padding: 0.5rem 0.75rem; margin-top: 0.5rem; }
+        .nav-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 8px; border: none; background: transparent; color: #5dd0ff; font-family: 'DM Mono', monospace; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; text-align: left; width: 100%; }
+        .nav-btn:hover { background: #0369a1; color: #a0e0ff; }
+        .nav-btn.active { background: #0077cc; color: #00b8ff; border-left: 2px solid #00b8ff; }
 
         .content { padding: 1.5rem; overflow-y: auto; }
 
         .section-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; color: #e8e6e0; margin-bottom: 0.25rem; }
-        .section-sub { font-size: 0.7rem; color: #0ea5e9; letter-spacing: 0.1em; margin-bottom: 1.5rem; }
+        .section-sub { font-size: 0.7rem; color: #0095e8; letter-spacing: 0.1em; margin-bottom: 1.5rem; }
 
-        .card { background: #0d1b2e; border: 1px solid #0284c7; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
-        .card-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #38bdf8; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+        .card { background: #0d1b2e; border: 1px solid #0077cc; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+        .card-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #00b8ff; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
         .form-group { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
-        .form-label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: #0ea5e9; }
-        .form-input { background: #0a1420; border: 1px solid #0284c7; border-radius: 8px; padding: 0.65rem 1rem; color: #e8e6e0; font-family: 'DM Mono', monospace; font-size: 0.85rem; outline: none; transition: border-color 0.2s; width: 100%; }
-        .form-input:focus { border-color: #38bdf8; }
+        .form-label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: #0095e8; }
+        .form-input { background: #0a1420; border: 1px solid #0077cc; border-radius: 8px; padding: 0.65rem 1rem; color: #e8e6e0; font-family: 'DM Mono', monospace; font-size: 0.85rem; outline: none; transition: border-color 0.2s; width: 100%; }
+        .form-input:focus { border-color: #00b8ff; }
         .form-input::placeholder { color: #075985; }
         select.form-input option { background: #0a1420; }
         textarea.form-input { resize: vertical; min-height: 80px; font-family: 'DM Mono', monospace; }
 
-        .file-input-wrapper { position: relative; background: #0a1420; border: 1px dashed #0284c7; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
-        .file-input-wrapper:hover { border-color: #38bdf8; }
+        .file-input-wrapper { position: relative; background: #0a1420; border: 1px dashed #0077cc; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+        .file-input-wrapper:hover { border-color: #00b8ff; }
         .file-input-wrapper input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-        .file-label { font-size: 0.8rem; color: #0ea5e9; }
-        .file-label strong { color: #38bdf8; }
+        .file-label { font-size: 0.8rem; color: #0095e8; }
+        .file-label strong { color: #00b8ff; }
 
         .btn { padding: 0.65rem 1.25rem; border-radius: 8px; border: none; font-family: 'DM Mono', monospace; font-size: 0.78rem; letter-spacing: 0.08em; cursor: pointer; transition: all 0.2s; }
-        .btn-primary { background: #0284c7; color: #38bdf8; border: 1px solid #0ea5e9; }
-        .btn-primary:hover { background: #075985; color: #bae6fd; }
+        .btn-primary { background: #0077cc; color: #00b8ff; border: 1px solid #0095e8; }
+        .btn-primary:hover { background: #075985; color: #a0e0ff; }
         .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-secondary { background: transparent; color: #7dd3fc; border: 1px solid #0284c7; }
-        .btn-secondary:hover { background: #0369a1; color: #bae6fd; }
+        .btn-secondary { background: transparent; color: #5dd0ff; border: 1px solid #0077cc; }
+        .btn-secondary:hover { background: #0369a1; color: #a0e0ff; }
         .btn-danger { background: transparent; color: #8b4444; border: 1px solid #4a2222; padding: 0.4rem 0.7rem; font-size: 0.72rem; }
         .btn-danger:hover { background: #2a1010; color: #c47070; border-color: #8b4444; }
         .btn-accent { background: transparent; color: #7a6a2a; border: 1px solid #4a3a10; padding: 0.4rem 0.7rem; font-size: 0.72rem; }
@@ -811,67 +811,66 @@ export default function AdminPanel() {
         .editing-badge { font-size: 0.62rem; background: #1a1030; color: #9d7fd4; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.1em; }
 
         .panorama-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
-        .panorama-card { background: #0a1420; border: 1px solid #0284c7; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; cursor: pointer; }
-        .panorama-card:hover { border-color: #0ea5e9; }
-        .panorama-card.selected { border-color: #38bdf8; }
+        .panorama-card { background: #0a1420; border: 1px solid #0077cc; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; cursor: pointer; }
+        .panorama-card:hover { border-color: #0095e8; }
+        .panorama-card.selected { border-color: #00b8ff; }
         .panorama-img { width: 100%; height: 120px; object-fit: cover; display: block; background: #0d1b2e; }
         .panorama-info { padding: 0.65rem 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; flex-wrap: wrap; }
-        .panorama-title { font-size: 0.78rem; color: #7dd3fc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+        .panorama-title { font-size: 0.78rem; color: #5dd0ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
 
         .hotspot-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
-        .hotspot-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem; border-radius: 8px; border: 1px solid #0284c7; background: #0a1420; font-size: 0.78rem; }
+        .hotspot-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem; border-radius: 8px; border: 1px solid #0077cc; background: #0a1420; font-size: 0.78rem; }
         .hotspot-item-info { display: flex; flex-direction: column; gap: 0.3rem; flex: 1; min-width: 0; }
         .hotspot-badge { font-size: 0.62rem; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.1em; display: inline-block; }
-        .hotspot-badge.scene { background: #0284c7; color: #38bdf8; }
+        .hotspot-badge.scene { background: #0077cc; color: #00b8ff; }
         .hotspot-badge.info { background: #1a1030; color: #9d7fd4; }
-        .hotspot-badge.linked { background: #0284c7; color: #38bdf8; }
+        .hotspot-badge.linked { background: #0077cc; color: #00b8ff; }
         .hotspot-badge.unlinked { background: #2a1010; color: #c47070; }
 
         .empty-state { text-align: center; padding: 2.5rem 1rem; color: #075985; font-size: 0.82rem; }
-        .empty-icon { font-size: 2rem; margin-bottom: 0.75rem; }
 
         .toast { position: fixed; bottom: 1.5rem; right: 1rem; left: 1rem; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.78rem; letter-spacing: 0.05em; z-index: 999; animation: slideUp 0.3s ease; text-align: center; }
-        .toast.success { background: #0284c7; color: #38bdf8; border: 1px solid #0ea5e9; }
+        .toast.success { background: #0077cc; color: #00b8ff; border: 1px solid #0095e8; }
         .toast.error { background: #2a1010; color: #c47070; border: 1px solid #4a2222; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
-        .stat-card { background: #0d1b2e; border: 1px solid #0284c7; border-radius: 10px; padding: 0.85rem 1rem; }
-        .stat-num { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: #38bdf8; font-weight: 700; }
-        .stat-label { font-size: 0.62rem; color: #0ea5e9; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 0.15rem; }
+        .stat-card { background: #0d1b2e; border: 1px solid #0077cc; border-radius: 10px; padding: 0.85rem 1rem; }
+        .stat-num { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: #00b8ff; font-weight: 700; }
+        .stat-label { font-size: 0.62rem; color: #0095e8; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 0.15rem; }
 
-        .info-box { background: #0a0f1a; border: 1px solid #0284c7; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.73rem; color: #38bdf8; margin-bottom: 1rem; line-height: 1.6; }
+        .info-box { background: #0a0f1a; border: 1px solid #0077cc; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.73rem; color: #00b8ff; margin-bottom: 1rem; line-height: 1.6; }
 
-        .click-image-wrapper { position: relative; width: 100%; border-radius: 8px; overflow: hidden; cursor: crosshair; border: 1px solid #0284c7; transition: border-color 0.2s; background: #0a1420; user-select: none; }
-        .click-image-wrapper:hover { border-color: #38bdf8; }
+        .click-image-wrapper { position: relative; width: 100%; border-radius: 8px; overflow: hidden; cursor: crosshair; border: 1px solid #0077cc; transition: border-color 0.2s; background: #0a1420; user-select: none; }
+        .click-image-wrapper:hover { border-color: #00b8ff; }
         .click-image-wrapper img { width: 100%; display: block; pointer-events: none; }
         .crosshair-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: rgba(255,255,255,0.35); letter-spacing: 0.15em; text-transform: uppercase; pointer-events: none; transition: opacity 0.2s; }
         .click-image-wrapper:hover .crosshair-label { opacity: 0; }
         .click-marker { position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
-        .click-marker-ring { width: 28px; height: 28px; border: 2px solid #38bdf8; border-radius: 50%; animation: markerPop 0.2s ease; }
-        .click-marker-dot { width: 6px; height: 6px; background: #38bdf8; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .click-marker-ring { width: 28px; height: 28px; border: 2px solid #00b8ff; border-radius: 50%; animation: markerPop 0.2s ease; }
+        .click-marker-dot { width: 6px; height: 6px; background: #00b8ff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         @keyframes markerPop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
         /* existing (already-saved) pins shown on the denah while placing/editing a new one */
         .existing-pin { position: absolute; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; }
         .existing-pin-dot { width: 16px; height: 16px; border-radius: 50%; background: #c4a840; border: 2px solid #0a1420; box-shadow: 0 0 0 2px #c4a840; }
 
-        .coord-readout { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; padding: 0.65rem 1rem; background: #0a1420; border: 1px solid #0284c7; border-radius: 8px; font-size: 0.78rem; align-items: center; }
+        .coord-readout { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem; padding: 0.65rem 1rem; background: #0a1420; border: 1px solid #0077cc; border-radius: 8px; font-size: 0.78rem; align-items: center; }
         .coord-empty { color: #075985; font-size: 0.72rem; letter-spacing: 0.05em; }
         .coord-pill { display: flex; align-items: center; gap: 0.5rem; }
-        .coord-key { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.15em; color: #0ea5e9; }
-        .coord-val { color: #bae6fd; font-size: 0.82rem; }
-        .coord-divider { width: 1px; height: 14px; background: #0284c7; }
+        .coord-key { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.15em; color: #0095e8; }
+        .coord-val { color: #a0e0ff; font-size: 0.82rem; }
+        .coord-divider { width: 1px; height: 14px; background: #0077cc; }
 
         .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
-        .room-card { background: #0a1420; border: 1px solid #0284c7; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; }
-        .room-card:hover { border-color: #0ea5e9; }
+        .room-card { background: #0a1420; border: 1px solid #0077cc; border-radius: 10px; overflow: hidden; transition: border-color 0.2s; }
+        .room-card:hover { border-color: #0095e8; }
         .room-card.editing { border-color: #4a6a9e; }
         .room-img { width: 100%; height: 120px; object-fit: cover; display: block; background: #0d1b2e; }
         .room-info { padding: 0.65rem 0.75rem; }
-        .room-name { font-size: 0.82rem; color: #7dd3fc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.3rem; }
-        .room-meta { font-size: 0.65rem; color: #0ea5e9; margin-bottom: 0.5rem; }
-        .room-desc { font-size: 0.7rem; color: #7dd3fc; line-height: 1.5; margin-bottom: 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .room-name { font-size: 0.82rem; color: #5dd0ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.3rem; }
+        .room-meta { font-size: 0.65rem; color: #0095e8; margin-bottom: 0.5rem; }
+        .room-desc { font-size: 0.7rem; color: #5dd0ff; line-height: 1.5; margin-bottom: 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .room-actions { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; }
 
         .bottom-tab-bar { display: none; }
@@ -912,28 +911,25 @@ export default function AdminPanel() {
             left: 0;
             right: 0;
             background: #0d1b2e;
-            border-top: 1px solid #0284c7;
+            border-top: 1px solid #0077cc;
             z-index: 80;
           }
           .bottom-tab-btn {
             flex: 1;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 4px;
-            padding: 0.65rem 0.5rem;
+            padding: 0.9rem 0.5rem;
             background: transparent;
             border: none;
-            color: #0ea5e9;
+            color: #0095e8;
             font-family: 'DM Mono', monospace;
-            font-size: 0.65rem;
+            font-size: 0.7rem;
             letter-spacing: 0.08em;
             cursor: pointer;
             transition: color 0.2s;
           }
-          .bottom-tab-btn.active { color: #38bdf8; border-top: 2px solid #38bdf8; }
-          .bottom-tab-icon { font-size: 1.2rem; }
+          .bottom-tab-btn.active { color: #00b8ff; border-top: 2px solid #00b8ff; }
 
           .form-row { grid-template-columns: 1fr; }
           .stats-row { gap: 0.5rem; }
@@ -972,24 +968,24 @@ export default function AdminPanel() {
 
       <div className="main-layout">
         <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-          <div className="sidebar-label">Navigation</div>
+          <div className="sidebar-label">Tour Virtual</div>
           <button className={`nav-btn ${activeTab === 'panoramas' ? 'active' : ''}`} onClick={() => { setActiveTab('panoramas'); setSidebarOpen(false); }}>
-            <span className="nav-icon">🌐</span> Panoramas
+            Panorama
           </button>
           <button className={`nav-btn ${activeTab === 'hotspots' ? 'active' : ''}`} onClick={() => { setActiveTab('hotspots'); setSidebarOpen(false); }}>
-            <span className="nav-icon">🎯</span> Hotspots
+            Hotspot
           </button>
 
-          <div className="sidebar-label" style={{ marginTop: '2rem' }}>Selected Panorama</div>
+          <div className="sidebar-label" style={{ marginTop: '2rem' }}>Panorama Terpilih</div>
           {selectedPanorama
-            ? <div style={{ padding: '0.5rem 1rem', background: '#0c4a6e', borderRadius: '8px', fontSize: '0.78rem', color: '#7dd3fc' }}>🌐 {selectedPanorama.title || `ID: ${selectedPanorama.id}`}</div>
-            : <div style={{ padding: '0.5rem 1rem', fontSize: '0.72rem', color: '#075985' }}>None selected</div>}
+            ? <div style={{ padding: '0.5rem 1rem', background: '#0c4a6e', borderRadius: '8px', fontSize: '0.78rem', color: '#5dd0ff' }}>{selectedPanorama.title || `ID: ${selectedPanorama.id}`}</div>
+            : <div style={{ padding: '0.5rem 1rem', fontSize: '0.72rem', color: '#075985' }}>Belum dipilih</div>}
 
           <hr className="sidebar-divider" />
 
-          <div className="sidebar-label">Content</div>
+          <div className="sidebar-label">Detail</div>
           <button className={`nav-btn ${activeTab === 'details' ? 'active' : ''}`} onClick={() => { setActiveTab('details'); setSidebarOpen(false); }}>
-            <span className="nav-icon">🖼️</span> Room Details
+            Detail Ruangan
           </button>
         </aside>
 
@@ -999,44 +995,43 @@ export default function AdminPanel() {
             {activeTab === 'details' ? (
               <div className="stat-card" style={{ gridColumn: '1 / -1' }}>
                 <div className="stat-num">{rooms.length}</div>
-                <div className="stat-label">Total Room Details</div>
+                <div className="stat-label">Total Detail Ruangan</div>
               </div>
             ) : (
               <>
-                <div className="stat-card"><div className="stat-num">{panoramas.length}</div><div className="stat-label">Panoramas</div></div>
-                <div className="stat-card"><div className="stat-num">{hotspots.length}</div><div className="stat-label">Hotspots</div></div>
-                <div className="stat-card"><div className="stat-num">{panoramas.filter((p: any) => p.is_first_scene).length > 0 ? '✓' : '—'}</div><div className="stat-label">First Scene</div></div>
+                <div className="stat-card"><div className="stat-num">{panoramas.length}</div><div className="stat-label">Panorama</div></div>
+                <div className="stat-card"><div className="stat-num">{hotspots.length}</div><div className="stat-label">Hotspot</div></div>
+                <div className="stat-card"><div className="stat-num">{panoramas.filter((p: any) => p.is_first_scene).length > 0 ? '✓' : '—'}</div><div className="stat-label">Scene Pertama</div></div>
               </>
             )}
           </div>
 
           {!locationId && (
             <div className="card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-              <div className="empty-icon" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📍</div>
-              <p style={{ color: '#0ea5e9', marginBottom: '1rem', fontSize: '0.82rem' }}>No locations yet. Create one to start adding panoramas.</p>
-              <button className="btn btn-primary" onClick={createDefaultLocation}>+ Create Location</button>
+              <p style={{ color: '#0095e8', marginBottom: '1rem', fontSize: '0.82rem' }}>Belum ada lokasi. Buat lokasi dulu untuk mulai menambahkan panorama.</p>
+              <button className="btn btn-primary" onClick={createDefaultLocation}>+ Buat Lokasi</button>
             </div>
           )}
 
           {/* ── PANORAMAS TAB ── */}
           {activeTab === 'panoramas' && (
             <>
-              <div className="section-title">Panoramas</div>
-              <div className="section-sub">MANAGE 360° SCENES</div>
+              <div className="section-title">Panorama</div>
+              <div className="section-sub">KELOLA SCENE 360°</div>
 
               <div className="info-box">
-                💡 Upload your 360° equirectangular images here. Click <strong style={{ color: '#c4a840' }}>☆ Set First</strong> on the scene where the tour should start. Click a panorama card to add hotspots to it.
+                Upload gambar equirectangular 360° kamu di sini. Klik <strong style={{ color: '#c4a840' }}>☆ Jadikan Pertama</strong> pada scene tempat tur harus dimulai. Klik kartu panorama untuk menambahkan hotspot ke situ.
               </div>
 
               <div className="card">
-                <div className="card-title">// Upload New Panorama</div>
+                <div className="card-title">// Upload Panorama Baru</div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">Title</label>
-                    <input className="form-input" placeholder="Scene title..." value={panoramaTitle} onChange={e => setPanoramaTitle(e.target.value)} />
+                    <label className="form-label">Judul</label>
+                    <input className="form-input" placeholder="Judul scene..." value={panoramaTitle} onChange={e => setPanoramaTitle(e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">360° Image</label>
+                    <label className="form-label">Gambar 360°</label>
                     <div className="file-input-wrapper" onClick={() => fileInputRef.current?.click()}>
                       <input
                         ref={fileInputRef}
@@ -1052,32 +1047,32 @@ export default function AdminPanel() {
                   </div>
                 </div>
                 <button className="btn btn-primary" onClick={handleAddPanorama} disabled={loading || !imageFile} style={{ width: '100%' }}>
-                  {loading ? 'Uploading...' : '↑ Upload Panorama'}
+                  {loading ? 'Mengupload...' : 'Upload Panorama'}
                 </button>
               </div>
 
               <div className="card">
-                <div className="card-title">// All Panoramas ({panoramas.length}) — tap a card to edit hotspots</div>
+                <div className="card-title">// Semua Panorama ({panoramas.length}) — tap kartu untuk mengedit hotspot</div>
                 {panoramas.length === 0
-                  ? <div className="empty-state"><div className="empty-icon">🌐</div>No panoramas yet. Upload one above!</div>
+                  ? <div className="empty-state">Belum ada panorama. Upload dulu di atas!</div>
                   : <div className="panorama-grid">
                     {panoramas.map((pan: any) => (
                       <div key={pan.id} className={`panorama-card ${selectedPanorama?.id === pan.id ? 'selected' : ''}`}
                         onClick={() => { setSelectedPanorama(pan); setActiveTab('hotspots'); }}>
                         <img className="panorama-img" src={pan.image_url} alt={pan.title}
-                          onError={(e: any) => { e.target.src = ''; e.target.style.background = '#0284c7'; }} />
+                          onError={(e: any) => { e.target.src = ''; e.target.style.background = '#0077cc'; }} />
                         <div className="panorama-info">
-                          <span className="panorama-title">{pan.title || 'Untitled'}</span>
+                          <span className="panorama-title">{pan.title || 'Tanpa judul'}</span>
                           <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                            {pan.is_first_scene ? <span className="first-badge">FIRST</span> : null}
+                            {pan.is_first_scene ? <span className="first-badge">PERTAMA</span> : null}
                             <button className={`btn btn-accent ${pan.is_first_scene ? 'on' : ''}`}
                               onClick={e => { e.stopPropagation(); handleSetFirstScene(pan.id); }}>
                               {pan.is_first_scene ? '★' : '☆'}
                             </button>
-                            <button className="btn btn-danger" onClick={e => { e.stopPropagation(); handleDeletePanorama(pan.id); }}>Del</button>
+                            <button className="btn btn-danger" onClick={e => { e.stopPropagation(); handleDeletePanorama(pan.id); }}>Hapus</button>
                           </div>
                         </div>
-                        <div style={{ padding: '0 0.75rem 0.5rem', fontSize: '0.62rem', color: '#0ea5e9' }}>ID: {pan.id}</div>
+                        <div style={{ padding: '0 0.75rem 0.5rem', fontSize: '0.62rem', color: '#0095e8' }}>ID: {pan.id}</div>
                       </div>
                     ))}
                   </div>}
@@ -1088,18 +1083,18 @@ export default function AdminPanel() {
           {/* ── HOTSPOTS TAB ── */}
           {activeTab === 'hotspots' && (
             <>
-              <div className="section-title">Hotspots</div>
-              <div className="section-sub">{selectedPanorama ? `EDITING: ${selectedPanorama.title || `Panorama #${selectedPanorama.id}`}` : 'SELECT A PANORAMA FIRST'}</div>
+              <div className="section-title">Hotspot</div>
+              <div className="section-sub">{selectedPanorama ? `MENGEDIT: ${selectedPanorama.title || `Panorama #${selectedPanorama.id}`}` : 'PILIH PANORAMA DULU'}</div>
 
               {!selectedPanorama
-                ? <div className="card"><div className="empty-state"><div className="empty-icon">🎯</div>Go to Panoramas tab and tap a panorama card to edit its hotspots.</div></div>
+                ? <div className="card"><div className="empty-state">Buka tab Panorama dan tap kartu panorama untuk mengedit hotspot-nya.</div></div>
                 : <>
                   <div className="card">
-                    <div className="card-title">// Step 1 — Tap on the image to place a hotspot</div>
+                    <div className="card-title">// Langkah 1 — Tap gambar untuk menempatkan hotspot</div>
                     <div className="click-image-wrapper" ref={imageRef} onClick={handleImageClick}>
                       <img src={selectedPanorama.image_url} alt={selectedPanorama.title} draggable={false}
                         onError={(e: any) => { e.target.style.display = 'none'; }} />
-                      {!clickMarker && <div className="crosshair-label">Tap to place hotspot</div>}
+                      {!clickMarker && <div className="crosshair-label">Tap untuk menempatkan hotspot</div>}
                       {clickMarker && (
                         <div className="click-marker" style={{ left: `${clickMarker.x}%`, top: `${clickMarker.y}%` }}>
                           <div className="click-marker-ring"><div className="click-marker-dot" /></div>
@@ -1109,7 +1104,7 @@ export default function AdminPanel() {
 
                     <div className="coord-readout">
                       {!clickMarker ? (
-                        <span className="coord-empty">↑ Tap anywhere on the panorama to set coordinates</span>
+                        <span className="coord-empty">Tap di mana saja pada panorama untuk mengatur koordinat</span>
                       ) : (
                         <>
                           <div className="coord-pill">
@@ -1124,7 +1119,7 @@ export default function AdminPanel() {
                           <div style={{ marginLeft: 'auto' }}>
                             <button className="btn btn-danger" style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem' }}
                               onClick={() => { setClickMarker(null); setHsPitch(''); setHsYaw(''); }}>
-                              Clear
+                              Hapus
                             </button>
                           </div>
                         </>
@@ -1133,30 +1128,30 @@ export default function AdminPanel() {
                   </div>
 
                   <div className="card">
-                    <div className="card-title">// Step 2 — Configure and save the hotspot</div>
+                    <div className="card-title">// Langkah 2 — Atur dan simpan hotspot</div>
                     <div className="info-box">
-                      💡 For <strong>scene</strong> type, pick the target panorama from the dropdown. For <strong>info</strong> type, just add a label text.
+                      Untuk tipe <strong>scene</strong>, pilih panorama tujuan dari dropdown. Untuk tipe <strong>info</strong>, cukup tambahkan teks label.
                     </div>
 
                     <div className="form-row" style={{ marginBottom: '0.5rem' }}>
                       <div className="form-group">
-                        <label className="form-label">Type</label>
+                        <label className="form-label">Tipe</label>
                         <select className="form-input" value={hsType} onChange={e => setHsType(e.target.value as 'scene' | 'info')}>
-                          <option value="scene">scene (link)</option>
-                          <option value="info">info (text)</option>
+                          <option value="scene">scene (tautan)</option>
+                          <option value="info">info (teks)</option>
                         </select>
                       </div>
                       <div className="form-group">
-                        <label className="form-label">Label Text</label>
-                        <input className="form-input" placeholder="e.g. Go to Lobby" value={hsText} onChange={e => setHsText(e.target.value)} />
+                        <label className="form-label">Teks Label</label>
+                        <input className="form-input" placeholder="misalnya Menuju Lobby" value={hsText} onChange={e => setHsText(e.target.value)} />
                       </div>
                     </div>
 
                     {hsType === 'scene' && (
                       <div className="form-group" style={{ marginBottom: '1rem' }}>
-                        <label className="form-label">Target Panorama (links to)</label>
+                        <label className="form-label">Panorama Tujuan (tertaut ke)</label>
                         <select className="form-input" value={hsTargetId} onChange={e => setHsTargetId(e.target.value)}>
-                          <option value="">Select target panorama...</option>
+                          <option value="">Pilih panorama tujuan...</option>
                           {panoramas.filter(p => p.id !== selectedPanorama.id).map((p: any) => (
                             <option key={p.id} value={p.id}>{p.title || `Panorama #${p.id}`} (ID: {p.id})</option>
                           ))}
@@ -1166,26 +1161,26 @@ export default function AdminPanel() {
 
                     <button className="btn btn-primary" style={{ marginTop: '0.5rem', width: '100%' }}
                       onClick={handleAddHotspot} disabled={loading || !hsPitch || !hsYaw}>
-                      {loading ? 'Adding...' : !hsPitch ? '↑ Tap image first to set position' : '+ Add Hotspot'}
+                      {loading ? 'Menambahkan...' : !hsPitch ? 'Tap gambar dulu untuk mengatur posisi' : '+ Tambah Hotspot'}
                     </button>
                   </div>
 
                   <div className="card">
-                    <div className="card-title">// Hotspots ({hotspots.length})</div>
+                    <div className="card-title">// Hotspot ({hotspots.length})</div>
                     {hotspots.length === 0
-                      ? <div className="empty-state"><div className="empty-icon">🎯</div>No hotspots yet. Tap the image above to place one!</div>
+                      ? <div className="empty-state">Belum ada hotspot. Tap gambar di atas untuk menempatkan satu!</div>
                       : <div className="hotspot-list">
                         {hotspots.map((hs: any) => (
                           <div key={hs.id} className="hotspot-item">
                             <div className="hotspot-item-info">
                               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                 <span className={`hotspot-badge ${hs.type}`}>{hs.type.toUpperCase()}</span>
-                                <span style={{ color: '#bae6fd', fontSize: '0.8rem' }}>{hs.text || '(no label)'}</span>
+                                <span style={{ color: '#a0e0ff', fontSize: '0.8rem' }}>{hs.text || '(tanpa label)'}</span>
                               </div>
-                              <span style={{ color: '#0ea5e9', fontSize: '0.68rem' }}>pitch: {hs.pitch} | yaw: {hs.yaw}</span>
-                              {hs.type === 'scene' && <span style={{ color: '#0ea5e9', fontSize: '0.68rem' }}>→ Panorama ID: {hs.target_panorama_id}</span>}
+                              <span style={{ color: '#0095e8', fontSize: '0.68rem' }}>pitch: {hs.pitch} | yaw: {hs.yaw}</span>
+                              {hs.type === 'scene' && <span style={{ color: '#0095e8', fontSize: '0.68rem' }}>menuju Panorama ID: {hs.target_panorama_id}</span>}
                             </div>
-                            <button className="btn btn-danger" onClick={() => handleDeleteHotspot(hs.id)}>Delete</button>
+                            <button className="btn btn-danger" onClick={() => handleDeleteHotspot(hs.id)}>Hapus</button>
                           </div>
                         ))}
                       </div>}
@@ -1197,40 +1192,37 @@ export default function AdminPanel() {
           {/* ── ROOM DETAILS TAB ── */}
           {activeTab === 'details' && (
             <>
-              <div className="section-title">Room Details</div>
-              <div className="section-sub">MANUAL PHOTO + TEXT FOR THE PUBLIC "DETAIL RUANGAN" PAGE</div>
+              <div className="section-title">Detail Ruangan</div>
+              <div className="section-sub">FOTO + TEKS MANUAL UNTUK HALAMAN PUBLIK "DETAIL RUANGAN"</div>
 
               <div className="info-box">
-                💡 Upload a photo and fill in the info below. This feeds the room detail page visitors see when they tap an area on the denah.
+                Upload foto dan isi info di bawah. Ini akan tampil di halaman detail ruangan yang dilihat pengunjung saat mereka tap area di denah.
               </div>
 
               {/* ── Add / Edit room form (photos picked below, before confirming) ── */}
               <div className="card">
                 <div className="card-title">
-                  <span>{editingRoomId ? `// Editing Room #${editingRoomId}` : '// Add Room Detail'}</span>
-                  {editingRoomId && <span className="editing-badge">EDITING</span>}
+                  <span>{editingRoomId ? `// Mengedit Ruangan #${editingRoomId}` : '// Tambah Detail Ruangan'}</span>
+                  {editingRoomId && <span className="editing-badge">MENGEDIT</span>}
                 </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Room Name</label>
-                    <input className="form-input" placeholder="e.g. Ruang RPL 1" value={roomName} onChange={e => setRoomName(e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Location (optional)</label>
-                    <input className="form-input" placeholder="e.g. Lantai 2, Gedung A" value={roomLocation} onChange={e => setRoomLocation(e.target.value)} />
-                  </div>
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Nama Ruangan</label>
+                  <input className="form-input" placeholder="misalnya Ruang RPL 1" value={roomName} onChange={e => setRoomName(e.target.value)} />
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">Capacity (optional)</label>
-                    <input className="form-input" type="number" placeholder="e.g. 36" value={roomCapacity} onChange={e => setRoomCapacity(e.target.value)} />
+                    <label className="form-label">Lokasi (opsional)</label>
+                    <input className="form-input" placeholder="misalnya Lantai 2, Gedung A" value={roomLocation} onChange={e => setRoomLocation(e.target.value)} />
                   </div>
-                  <div className="form-group" />
+                  <div className="form-group">
+                    <label className="form-label">Kapasitas (opsional)</label>
+                    <input className="form-input" type="number" placeholder="misalnya 36" value={roomCapacity} onChange={e => setRoomCapacity(e.target.value)} />
+                  </div>
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '1rem' }}>
-                  <label className="form-label">Description</label>
+                  <label className="form-label">Deskripsi</label>
                   <textarea
                     className="form-input"
                     placeholder="Deskripsikan ruangan ini..."
@@ -1260,8 +1252,8 @@ export default function AdminPanel() {
                       <strong>Pilih gambar</strong> atau tap di sini — bisa pilih beberapa sekaligus
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.68rem', color: '#0ea5e9' }}>
-                    Foto diupload saat kamu tekan Save/Add di bawah. Selama belum ditekan, foto masih bisa ditambah atau dibatalkan lewat preview di bawah ini. Kalau totalnya lebih dari 1 foto, halaman publik otomatis nampilin carousel.
+                  <span style={{ fontSize: '0.68rem', color: '#0095e8' }}>
+                    Foto diupload saat kamu tekan Simpan/Tambah di bawah. Selama belum ditekan, foto masih bisa ditambah atau dibatalkan lewat preview di bawah ini. Kalau totalnya lebih dari 1 foto, halaman publik otomatis menampilkan carousel.
                   </span>
                 </div>
 
@@ -1269,7 +1261,7 @@ export default function AdminPanel() {
                 {roomPreviewSlides.length > 0 && (
                   <div className="form-group" style={{ marginBottom: '1rem' }}>
                     <label className="form-label">Preview Carousel (tampilan di Detail Ruangan)</label>
-                    <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', border: '1px solid #0284c7', background: '#0a1420' }}>
+                    <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', border: '1px solid #0077cc', background: '#0a1420' }}>
                       <img
                         src={roomPreviewSlides[previewSlideIndex]?.url}
                         alt={roomPreviewSlides[previewSlideIndex]?.label}
@@ -1280,16 +1272,16 @@ export default function AdminPanel() {
                           <button
                             type="button"
                             onClick={() => setPreviewSlideIndex(i => (i - 1 + roomPreviewSlides.length) % roomPreviewSlides.length)}
-                            style={{ position: 'absolute', top: '50%', left: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(10,10,15,0.7)', color: '#38bdf8', border: '1px solid #0284c7', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
+                            style={{ position: 'absolute', top: '50%', left: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(10,10,15,0.7)', color: '#00b8ff', border: '1px solid #0077cc', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
                           >‹</button>
                           <button
                             type="button"
                             onClick={() => setPreviewSlideIndex(i => (i + 1) % roomPreviewSlides.length)}
-                            style={{ position: 'absolute', top: '50%', right: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(10,10,15,0.7)', color: '#38bdf8', border: '1px solid #0284c7', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
+                            style={{ position: 'absolute', top: '50%', right: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(10,10,15,0.7)', color: '#00b8ff', border: '1px solid #0077cc', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
                           >›</button>
                         </>
                       )}
-                      <div style={{ position: 'absolute', bottom: '0.6rem', left: '0.6rem', background: 'rgba(10,10,15,0.75)', color: '#bae6fd', fontSize: '0.68rem', padding: '0.25rem 0.6rem', borderRadius: '4px', letterSpacing: '0.05em' }}>
+                      <div style={{ position: 'absolute', bottom: '0.6rem', left: '0.6rem', background: 'rgba(10,10,15,0.75)', color: '#a0e0ff', fontSize: '0.68rem', padding: '0.25rem 0.6rem', borderRadius: '4px', letterSpacing: '0.05em' }}>
                         {roomPreviewSlides[previewSlideIndex]?.label} · {previewSlideIndex + 1}/{roomPreviewSlides.length}
                       </div>
                     </div>
@@ -1302,7 +1294,7 @@ export default function AdminPanel() {
                             type="button"
                             onClick={() => setPreviewSlideIndex(i)}
                             aria-label={`Slide ${i + 1}`}
-                            style={{ width: '9px', height: '9px', padding: 0, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === previewSlideIndex ? '#38bdf8' : '#0284c7' }}
+                            style={{ width: '9px', height: '9px', padding: 0, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === previewSlideIndex ? '#00b8ff' : '#0077cc' }}
                           />
                         ))}
                       </div>
@@ -1327,35 +1319,35 @@ export default function AdminPanel() {
                     disabled={roomLoading || !roomName.trim() || (!editingRoomId && galleryFiles.length === 0)}
                     style={{ flex: 1 }}
                   >
-                    {roomLoading ? 'Saving...' : editingRoomId ? '✓ Save Changes' : '+ Add Room Detail'}
+                    {roomLoading ? 'Menyimpan...' : editingRoomId ? '✓ Simpan Perubahan' : '+ Tambah Detail Ruangan'}
                   </button>
                   {editingRoomId && (
-                    <button className="btn btn-secondary" onClick={resetRoomForm}>Cancel</button>
+                    <button className="btn btn-secondary" onClick={resetRoomForm}>Batal</button>
                   )}
                 </div>
               </div>
 
               {/* ── Room list ── */}
               <div className="card">
-                <div className="card-title">// All Rooms ({rooms.length})</div>
+                <div className="card-title">// Semua Ruangan ({rooms.length})</div>
                 {rooms.length === 0
-                  ? <div className="empty-state"><div className="empty-icon">🖼️</div>No room details yet. Add one above!</div>
+                  ? <div className="empty-state">Belum ada detail ruangan. Tambahkan satu di atas!</div>
                   : <div className="room-grid">
                     {rooms.map((room: any) => (
                       <div key={room.id} className={`room-card ${editingRoomId === room.id ? 'editing' : ''}`}>
                         <img className="room-img" src={room.image_url} alt={room.name}
-                          onError={(e: any) => { e.target.src = ''; e.target.style.background = '#0284c7'; }} />
+                          onError={(e: any) => { e.target.src = ''; e.target.style.background = '#0077cc'; }} />
                         <div className="room-info">
                           <div className="room-name">{room.name}</div>
                           <div className="room-meta">
-                            {room.location ? `📍 ${room.location}` : ''}{room.location && room.capacity ? ' · ' : ''}{room.capacity ? `👥 ${room.capacity}` : ''}
+                            {room.location || ''}{room.location && room.capacity ? ' · ' : ''}{room.capacity ? `${room.capacity} orang` : ''}
                           </div>
                           {room.description && <div className="room-desc">{room.description}</div>}
                           <div className="room-actions">
-                            <span style={{ fontSize: '0.62rem', color: '#0ea5e9' }}>ID: {room.id}</span>
+                            <span style={{ fontSize: '0.62rem', color: '#0095e8' }}>ID: {room.id}</span>
                             <div style={{ display: 'flex', gap: '0.4rem' }}>
                               <button className="btn btn-edit" onClick={() => handleEditRoomClick(room)}>Edit</button>
-                              <button className="btn btn-danger" onClick={() => handleDeleteRoom(room.id)}>Del</button>
+                              <button className="btn btn-danger" onClick={() => handleDeleteRoom(room.id)}>Hapus</button>
                             </div>
                           </div>
                         </div>
@@ -1369,18 +1361,18 @@ export default function AdminPanel() {
               <div className="section-sub">TENTUKAN AREA MANA YANG BISA DIKLIK PENGUNJUNG DI DENAH</div>
 
               <div className="info-box">
-                💡 Tap posisi ruangan di denah untuk menandai area, kasih label, lalu (opsional) hubungkan ke salah satu Room Detail di atas. Kalau belum dihubungkan ke room manapun, pengunjung akan lihat pesan "belum tersedia" saat nge-tap area itu.
+                Tap posisi ruangan di denah untuk menandai area, kasih label, lalu (opsional) hubungkan ke salah satu Detail Ruangan di atas. Kalau belum dihubungkan ke ruangan manapun, pengunjung akan lihat pesan "belum tersedia" saat nge-tap area itu.
               </div>
 
               <div className="card">
                 <div className="card-title">
-                  <span>{editingPinId ? `// Editing Area #${editingPinId}` : '// Step 1 — Tap posisi di denah'}</span>
-                  {editingPinId && <span className="editing-badge">EDITING</span>}
+                  <span>{editingPinId ? `// Mengedit Area #${editingPinId}` : '// Langkah 1 — Tap posisi di denah'}</span>
+                  {editingPinId && <span className="editing-badge">MENGEDIT</span>}
                 </div>
                 <div className="click-image-wrapper" ref={mapImageRef} onClick={handleMapClick}>
                   <img src="/Denah.jpeg" alt="Denah SMK Negeri 11 Bandung" draggable={false}
                     onError={(e: any) => { e.target.style.display = 'none'; }} />
-                  {!pinMarker && <div className="crosshair-label">Tap to place area</div>}
+                  {!pinMarker && <div className="crosshair-label">Tap untuk menempatkan area</div>}
 
                   {/* Show already-saved pins for reference (skip the one currently being edited) */}
                   {pins.filter(p => p.id !== editingPinId).map((p: any) => (
@@ -1398,7 +1390,7 @@ export default function AdminPanel() {
 
                 <div className="coord-readout">
                   {!pinMarker ? (
-                    <span className="coord-empty">↑ Tap di denah untuk menentukan posisi area</span>
+                    <span className="coord-empty">Tap di denah untuk menentukan posisi area</span>
                   ) : (
                     <>
                       <div className="coord-pill">
@@ -1413,7 +1405,7 @@ export default function AdminPanel() {
                       <div style={{ marginLeft: 'auto' }}>
                         <button className="btn btn-danger" style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem' }}
                           onClick={() => setPinMarker(null)}>
-                          Clear
+                          Hapus
                         </button>
                       </div>
                     </>
@@ -1422,14 +1414,14 @@ export default function AdminPanel() {
               </div>
 
               <div className="card">
-                <div className="card-title">// Step 2 — Label & hubungkan ke room</div>
+                <div className="card-title">// Langkah 2 — Label & hubungkan ke ruangan</div>
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Label Area</label>
-                    <input className="form-input" placeholder="e.g. Ruang Teori 7" value={pinLabel} onChange={e => setPinLabel(e.target.value)} />
+                    <input className="form-input" placeholder="misalnya Ruang Teori 7" value={pinLabel} onChange={e => setPinLabel(e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Hubungkan ke Room Detail</label>
+                    <label className="form-label">Hubungkan ke Detail Ruangan</label>
                     <select className="form-input" value={pinRoomId} onChange={e => setPinRoomId(e.target.value)}>
                       <option value="">Belum ada detail</option>
                       {rooms.map((r: any) => (
@@ -1446,18 +1438,18 @@ export default function AdminPanel() {
                     disabled={pinLoading || !pinMarker || !pinLabel.trim()}
                     style={{ flex: 1 }}
                   >
-                    {pinLoading ? 'Saving...' : editingPinId ? '✓ Save Area' : '+ Add Area'}
+                    {pinLoading ? 'Menyimpan...' : editingPinId ? '✓ Simpan Area' : '+ Tambah Area'}
                   </button>
                   {(editingPinId || pinMarker || pinLabel) && (
-                    <button className="btn btn-secondary" onClick={resetPinForm}>Cancel</button>
+                    <button className="btn btn-secondary" onClick={resetPinForm}>Batal</button>
                   )}
                 </div>
               </div>
 
               <div className="card">
-                <div className="card-title">// Areas on Denah ({pins.length})</div>
+                <div className="card-title">// Area di Denah ({pins.length})</div>
                 {pins.length === 0
-                  ? <div className="empty-state"><div className="empty-icon">📍</div>Belum ada area. Tandai di denah di atas!</div>
+                  ? <div className="empty-state">Belum ada area. Tandai di denah di atas!</div>
                   : <div className="hotspot-list">
                     {pins.map((pin: any) => {
                       const linkedRoom = rooms.find((r: any) => r.id === pin.room_id);
@@ -1468,14 +1460,14 @@ export default function AdminPanel() {
                               <span className={`hotspot-badge ${linkedRoom ? 'linked' : 'unlinked'}`}>
                                 {linkedRoom ? 'TERHUBUNG' : 'BELUM TERHUBUNG'}
                               </span>
-                              <span style={{ color: '#bae6fd', fontSize: '0.8rem' }}>{pin.label}</span>
+                              <span style={{ color: '#a0e0ff', fontSize: '0.8rem' }}>{pin.label}</span>
                             </div>
-                            <span style={{ color: '#0ea5e9', fontSize: '0.68rem' }}>x: {pin.map_x}% | y: {pin.map_y}%</span>
-                            {linkedRoom && <span style={{ color: '#0ea5e9', fontSize: '0.68rem' }}>→ {linkedRoom.name}</span>}
+                            <span style={{ color: '#0095e8', fontSize: '0.68rem' }}>x: {pin.map_x}% | y: {pin.map_y}%</span>
+                            {linkedRoom && <span style={{ color: '#0095e8', fontSize: '0.68rem' }}>menuju {linkedRoom.name}</span>}
                           </div>
                           <div style={{ display: 'flex', gap: '0.4rem' }}>
                             <button className="btn btn-edit" onClick={() => handleEditPinClick(pin)}>Edit</button>
-                            <button className="btn btn-danger" onClick={() => handleDeletePin(pin.id)}>Del</button>
+                            <button className="btn btn-danger" onClick={() => handleDeletePin(pin.id)}>Hapus</button>
                           </div>
                         </div>
                       );
@@ -1490,16 +1482,13 @@ export default function AdminPanel() {
       {/* Bottom tab bar (mobile only) */}
       <nav className="bottom-tab-bar">
         <button className={`bottom-tab-btn ${activeTab === 'panoramas' ? 'active' : ''}`} onClick={() => setActiveTab('panoramas')}>
-          <span className="bottom-tab-icon">🌐</span>
-          Panoramas
+          Panorama
         </button>
         <button className={`bottom-tab-btn ${activeTab === 'hotspots' ? 'active' : ''}`} onClick={() => setActiveTab('hotspots')}>
-          <span className="bottom-tab-icon">🎯</span>
-          Hotspots
+          Hotspot
         </button>
         <button className={`bottom-tab-btn ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>
-          <span className="bottom-tab-icon">🖼️</span>
-          Details
+          Detail
         </button>
       </nav>
 
