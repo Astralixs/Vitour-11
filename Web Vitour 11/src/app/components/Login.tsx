@@ -53,9 +53,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       position: 'relative',
       overflow: 'hidden',
       backgroundColor: '#0a1420', // fallback while the image loads / if it fails
+
     }}>
       <img
-        src="/14994805.png"
+        src="smkn11A.jpg"
         alt=""
         style={{
           position: 'absolute',
@@ -83,8 +84,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           max-width: 380px;
         }
 
-        .login-logo { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 900; text-align: center; background: linear-gradient(135deg, #00b8ff, #a0e0ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .login-logo span { font-weight: 300; font-size: 0.72rem; display: block; margin-top: 0.35rem; background: #5dd0ff; -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 0.2em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
+        .login-logo { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 900; text-align: center; background: linear-gradient(135deg, #00b8ff, #a0e0ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; -webkit-text-stroke: 0.px white; }
+        .login-logo span { font-weight: 300; font-size: 0.72rem; display: block; margin-top: 0.35rem; background: #5dd0ff; -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 0.2em; text-transform: uppercase; font-family: 'DM Mono', monospace; -webkit-text-stroke: 0.5px white; }
 
         .login-form { margin-top: 2rem; display: flex; flex-direction: column; gap: 1rem; }
         .login-form-group { display: flex; flex-direction: column; gap: 0.4rem; }
