@@ -56,7 +56,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
     }}>
       <img
-        src="bg3.jpeg"
+        src="/bg3.jpeg"
         alt=""
         style={{
           position: 'absolute',
