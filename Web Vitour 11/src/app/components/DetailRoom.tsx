@@ -128,6 +128,17 @@ export default function DetailRoom() {
 
   return (
     <div className="min-h-screen bg-white">
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in-text {
+          opacity: 0;
+          animation: fadeInUp 0.6s ease-out forwards;
+        }
+      `}</style>
+
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-16">
         <Link
           to="/Details"
@@ -139,7 +150,7 @@ export default function DetailRoom() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
           {/* Photo / Carousel */}
-          <div>
+          <div className="fade-in-text" style={{ animationDelay: '0s' }}>
             <div className="relative rounded-xl overflow-hidden shadow-lg border border-[#c2c6d5] aspect-video bg-[#f0f3ff]">
               <div
                 className="flex h-full transition-transform duration-500 ease-out"
@@ -207,7 +218,7 @@ export default function DetailRoom() {
 
           {/* Text */}
           <div className="space-y-5 md:space-y-6">
-            <div>
+            <div className="fade-in-text" style={{ animationDelay: '0.1s' }}>
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#004fa7] mb-2">
                 {room.name}
               </h1>
@@ -227,7 +238,10 @@ export default function DetailRoom() {
               </div>
             </div>
 
-            <p className="text-[#424753] text-sm md:text-base leading-relaxed whitespace-pre-line">
+            <p
+              className="fade-in-text text-[#424753] text-sm md:text-base leading-relaxed whitespace-pre-line"
+              style={{ animationDelay: '0.2s' }}
+            >
               {room.description}
             </p>
           </div>

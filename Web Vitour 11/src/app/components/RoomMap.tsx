@@ -73,7 +73,6 @@ export default function RoomMap() {
   const handlePinClick = (pin: Pin) => {
     const room = pin.room_id ? rooms[pin.room_id] : null;
 
-    // No linked room yet, or the room has no photo — treat as "not available".
     if (!pin.room_id || !room || !room.image_url) {
       setWarning(`Detail untuk "${pin.label}" belum tersedia.`);
       window.clearTimeout((window as any).__roomWarnTimeout);
@@ -86,6 +85,17 @@ export default function RoomMap() {
 
   return (
     <div className="min-h-screen bg-white">
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in-text {
+          opacity: 0;
+          animation: fadeInUp 0.6s ease-out forwards;
+        }
+      `}</style>
+
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 md:py-12">
         <Link
           to="/"
@@ -95,10 +105,16 @@ export default function RoomMap() {
           Kembali ke Beranda
         </Link>
 
-        <h1 className="text-2xl md:text-3xl font-bold text-[#004fa7] mb-2">
+        <h1
+          className="fade-in-text text-2xl md:text-3xl font-bold text-[#004fa7] mb-2"
+          style={{ animationDelay: '0.05s' }}
+        >
           Denah Ruangan
         </h1>
-        <p className="text-[#424753] text-sm md:text-base mb-6">
+        <p
+          className="fade-in-text text-[#424753] text-sm md:text-base mb-6"
+          style={{ animationDelay: '0.15s' }}
+        >
           Tap pada titik di denah untuk melihat detail ruangan.
         </p>
 
@@ -144,7 +160,7 @@ export default function RoomMap() {
         )}
 
         {!loading && pins.length === 0 && (
-          <p className="text-center text-sm text-[#424753] mt-6">
+          <p className="text-center text-sm text-[#424753] mt-6 fade-in-text">
             Belum ada area yang ditandai di denah.
           </p>
         )}
