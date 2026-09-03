@@ -1,0 +1,251 @@
+import { Link } from 'react-router';
+import { MapPin, Phone, ShieldCheck, Compass, Clock, Search } from 'lucide-react';
+import { Button } from '../ui/button';
+import { useState, useEffect, useRef } from 'react';
+
+const API_URL = import.meta.env.VITE_API_URL;
+
+function useReveal() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return { ref, visible };
+}
+
+export default function HomePage() {
+  const [locationId, setLocationId] = useState<number | null>(null);
+  const [activeSection, setActiveSection] = useState('home');
+  const [scrolled, setScrolled] = useState(false);
+
+  const locationReveal = useReveal();
+  const locationInfo = useReveal();
+  const locationMap = useReveal();
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/locations`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.length > 0) setLocationId(data[0].id);
+      });
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    onScroll();
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    const sections = ['home', 'location'];
+    const observers: IntersectionObserver[] = [];
+
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) setActiveSection(id);
+        },
+        { threshold: 0.4 }
+      );
+      obs.observe(el);
+      observers.push(obs);
+    });
+
+    return () => observers.forEach(obs => obs.disconnect());
+  }, []);
+
+  const fadeUp = (visible: boolean, delay = 0) =>
+    `transition-all duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${delay ? `delay-[${delay}ms]` : ''} ${
+      visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+    }`;
+
+  return (
+    <div className="min-h-screen bg-white">
+      <style>{`
+        @keyframes fadeSlideDown {
+          from { opacity: 0; transform: translateY(-20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(40px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        .hero-title  { animation: fadeSlideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+        .hero-sub    { animation: fadeSlideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.65s both; }
+        .hero-btn    { animation: fadeSlideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 1s both; }
+        .hero-overlay { animation: fadeIn 1.8s ease-out 0s both; }
+        .nav-anim    { animation: fadeSlideDown 1s cubic-bezier(0.16, 1, 0.3, 1) 0s both; }
+        .card-hover  {
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-hover:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 20px 40px rgba(0,79,167,0.15);
+        }
+      `}</style>
+
+      {/* Navigation Header (kept from original, now transparent/overlaying) */}
+      <nav
+        className={`nav-anim fixed top-0 left-0 w-full z-50 text-white px-4 md:px-8 py-3 md:py-4 transition-all duration-700 ease-in-out ${
+          scrolled ? 'bg-black/30 backdrop-blur-md shadow-md' : 'bg-transparent backdrop-blur-0 shadow-none'
+        }`}
+      >
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <h1 className="text-lg md:text-2xl font-bold">Virtual Tour 11</h1>
+          <div className="flex gap-3 md:gap-6 text-sm md:text-base">
+            <a href="#home" className={`hover:text-blue-200 transition-colors ${activeSection === 'home' ? 'font-bold underline' : ''}`}>Home</a>
+            <a href="#location" className={`hover:text-blue-200 transition-colors ${activeSection === 'location' ? 'font-bold underline' : ''}`}>Location</a>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section id="home" className="relative w-full h-[80vh] min-h-[480px] md:min-h-[600px] flex items-center overflow-hidden">
+        <div className="absolute inset-0 hero-overlay">
+          <img
+            src="/slide_2a.jpeg"
+            alt="SMKN 11 Bandung"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60"></div>
+        </div>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-16 text-white w-full">
+          <div className="max-w-2xl">
+            <h1 className="hero-title text-3xl sm:text-4xl md:text-6xl font-bold leading-tight mb-3 md:mb-4">
+              Welcome to SMK Negeri 11 Bandung
+            </h1>
+            <p className="hero-sub text-base sm:text-lg md:text-xl opacity-90 mb-6 md:mb-8">
+              Membangun generasi unggul yang siap kerja, mandiri, dan berkarakter mulia melalui pendidikan vokasi berkualitas internasional.
+            </p>
+            <div className="hero-btn flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <Link to={locationId ? `/tour?location_id=${locationId}` : '/tour'}>
+                <Button
+                  size="default"
+                  className="flex items-center gap-2 bg-[#0667d3] text-white hover:bg-[#004fa7] rounded-md text-sm md:text-base px-5 md:px-6 py-2.5 md:py-3 h-auto transition-transform duration-200 hover:scale-105 active:scale-95 w-full sm:w-auto"
+                >
+                  <Compass size={18} />
+                  Mulai Tour Virtual
+                </Button>
+              </Link>
+              <Link to="/Details"> 
+                <Button
+                  size="default"
+                  className="flex items-center gap-2 bg-[#0667d3] text-white hover:bg-[#004fa7] rounded-md text-sm md:text-base px-5 md:px-6 py-2.5 md:py-3 h-auto transition-transform duration-200 hover:scale-105 active:scale-95 w-full sm:w-auto"
+                >
+                  <Search size={18} />
+                  Detail Ruangan
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact & Location Section */}
+      <section id="location" className="py-12 md:py-20 px-4 md:px-16 bg-[#f0f3ff]">
+        <div className="max-w-7xl mx-auto">
+          <div ref={locationReveal.ref} className={fadeUp(locationReveal.visible)}>
+            <h2 className="text-2xl md:text-4xl font-bold text-[#004fa7] mb-2">Hubungi Kami</h2>
+            <p className="text-[#424753] text-sm md:text-base mb-8 md:mb-12">
+              Kunjungi kampus kami atau hubungi kami melalui saluran di bawah ini.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-stretch">
+            {/* Left Column: Info & Hours */}
+            <div ref={locationInfo.ref} className={`md:col-span-5 space-y-6 ${fadeUp(locationInfo.visible, 0)}`}>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 md:gap-4 group">
+                  <div className="bg-white p-2 md:p-3 rounded-lg border border-[#c2c6d5] group-hover:border-[#004fa7] transition-colors flex-shrink-0">
+                    <MapPin className="text-[#004fa7]" size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm md:text-base">Alamat</h4>
+                    <p className="text-[#424753] text-sm md:text-base">
+                      Jl. Budi Raya No. 11, Cijagra, Kec. Lengkong, Kota Bandung, Jawa Barat 40265
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 md:gap-4 group">
+                  <div className="bg-white p-2 md:p-3 rounded-lg border border-[#c2c6d5] group-hover:border-[#004fa7] transition-colors flex-shrink-0">
+                    <Phone className="text-[#004fa7]" size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm md:text-base">Telepon</h4>
+                    <p className="text-[#424753] text-sm md:text-base">(022) 7315150</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#004fa7] text-white p-5 md:p-6 rounded-xl shadow-sm border-l-8 border-[#d7e2ff]">
+                <h3 className="font-bold mb-3 flex items-center gap-2 text-sm md:text-base">
+                  <Clock size={16} />
+                  Jam Operasional
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span className="text-xs md:text-sm">Senin - Jumat</span>
+                    <span className="text-xs md:text-sm font-bold">07.00 - 16.00 WIB</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs md:text-sm">Sabtu</span>
+                    <span className="text-xs md:text-sm font-bold">07.00 - 12.00 WIB</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Live Map (kept from original) */}
+            <div
+              ref={locationMap.ref}
+              className={`md:col-span-7 h-[300px] md:h-full min-h-[350px] md:min-h-[400px] rounded-xl overflow-hidden border border-[#c2c6d5] shadow-lg ${fadeUp(locationMap.visible, 250)}`}
+            >
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3961.00062464909!2d107.55575517427145!3d-6.890527093108526!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e68e6bd6aaaaaab%3A0xf843088e2b5bf838!2sSMK%20Negeri%2011%20Bandung!5e0!3m2!1sen!2sid!4v1775716742394!5m2!1sen!2sid"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Lokasi SMK Negeri 11 Bandung"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-[#2c3e8f] text-white py-6 md:py-8 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto text-center">
+          <p className="text-sm md:text-lg">
+            ViTour 11 | All rights reserved.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
