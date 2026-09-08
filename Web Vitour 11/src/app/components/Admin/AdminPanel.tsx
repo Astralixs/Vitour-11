@@ -10,7 +10,7 @@ export default function AdminPanel() {
   const [session, setSession] = useState<Session | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'panoramas' | 'hotspots' | 'details'>('panoramas');
+  const [activeTab, setActiveTab] = useState<'panoramas' | 'hotspots' | 'details' | 'data'>('panoramas');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -261,6 +261,13 @@ export default function AdminPanel() {
         .room-desc { font-size: 0.7rem; color: #5dd0ff; line-height: 1.5; margin-bottom: 0.6rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .room-actions { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; }
 
+        .pie-chart-wrap { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; justify-content: center; padding: 0.5rem 0; }
+        .pie-legend { display: flex; flex-direction: column; gap: 0.5rem; min-width: 200px; flex: 1; }
+        .pie-legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #a0e0ff; }
+        .pie-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+        .pie-legend-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pie-legend-value { color: #0095e8; font-size: 0.72rem; white-space: nowrap; }
+
         .bottom-tab-bar { display: none; }
 
         @media (max-width: 768px) {
@@ -375,6 +382,9 @@ export default function AdminPanel() {
           <button className={`nav-btn ${activeTab === 'details' ? 'active' : ''}`} onClick={() => { setActiveTab('details'); setSidebarOpen(false); }}>
             Detail Ruangan
           </button>
+          <button className={`nav-btn ${activeTab === 'data' ? 'active' : ''}`} onClick={() => { setActiveTab('data'); setSidebarOpen(false); }}>
+            Data
+          </button>
         </aside>
 
         <main className="content">
@@ -387,7 +397,9 @@ export default function AdminPanel() {
             />
           )}
 
-          {activeTab === 'details' && <Detail showToast={showToast} />}
+          {(activeTab === 'details' || activeTab === 'data') && (
+            <Detail view={activeTab === 'data' ? 'data' : 'details'} showToast={showToast} />
+          )}
         </main>
       </div>
 
@@ -401,6 +413,9 @@ export default function AdminPanel() {
         </button>
         <button className={`bottom-tab-btn ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>
           Detail
+        </button>
+        <button className={`bottom-tab-btn ${activeTab === 'data' ? 'active' : ''}`} onClick={() => setActiveTab('data')}>
+          Data
         </button>
       </nav>
 

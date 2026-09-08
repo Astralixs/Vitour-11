@@ -2,10 +2,31 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../../../services/supabase';
 
 interface DetailProps {
+  /** 'details' (default) shows the room/denah editor. 'data' shows the photo-count pie chart. */
+  view?: 'details' | 'data';
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
-export default function Detail({ showToast }: DetailProps) {
+const GEDUNG_OPTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+const PIE_COLORS = ['#00b8ff', '#9d7fd4', '#c4a840', '#5dd0ff', '#4a6a9e', '#0095e8', '#7098c4', '#a0e0ff', '#0077cc', '#c47070'];
+
+function polarToCartesian(cx: number, cy: number, r: number, angle: number) {
+  return { x: cx + r * Math.sin(angle), y: cy - r * Math.cos(angle) };
+}
+
+function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
+  // Full-circle single slice (only one room has photos): split into two half-arcs so SVG renders it.
+  if (endAngle - startAngle >= 2 * Math.PI - 0.0001) {
+    const mid = startAngle + Math.PI;
+    return `${arcPath(cx, cy, r, startAngle, mid)} ${arcPath(cx, cy, r, mid, endAngle)}`;
+  }
+  const start = polarToCartesian(cx, cy, r, startAngle);
+  const end = polarToCartesian(cx, cy, r, endAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+  return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
+}
+
+export default function Detail({ view = 'details', showToast }: DetailProps) {
   // ── ROOM DETAILS STATE (feeds the public "Detail Ruangan" page) ──
   const [rooms, setRooms] = useState<any[]>([]);
   const [roomName, setRoomName] = useState('');
@@ -46,10 +67,90 @@ export default function Detail({ showToast }: DetailProps) {
 
   const mapImageRef = useRef<HTMLDivElement>(null);
 
+  // ── PICTURE STATS (feeds the "Data" pie chart) ──
+  const [galleryCounts, setGalleryCounts] = useState<Record<number, number>>({});
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  // Keep a live ref to the room currently being edited, so the realtime callback below
+  // (subscribed once on mount) always sees the latest value without needing to resubscribe.
+  const editingRoomIdRef = useRef<number | null>(null);
+  useEffect(() => { editingRoomIdRef.current = editingRoomId; }, [editingRoomId]);
+
   useEffect(() => {
     fetchRooms();
     fetchPins();
+    fetchPictureCounts();
+
+    // Realtime: any insert/update/delete on rooms or room_images (from this admin tab,
+    // another admin tab, or the public site) refreshes the data automatically.
+    const channel = supabase
+      .channel('detail-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
+        fetchRooms();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_images' }, () => {
+        fetchPictureCounts();
+        if (editingRoomIdRef.current) fetchGalleryImages(editingRoomIdRef.current);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchPictureCounts = async () => {
+    setStatsLoading(true);
+    try {
+      const { data, error } = await supabase.from('room_images').select('room_id');
+      if (error) throw error;
+      const counts: Record<number, number> = {};
+      (data || []).forEach((row: any) => {
+        counts[row.room_id] = (counts[row.room_id] || 0) + 1;
+      });
+      setGalleryCounts(counts);
+    } catch (err: any) {
+      console.error('[fetchPictureCounts] FULL ERROR:', err);
+      showToast(`Gagal mengambil statistik foto: ${err.message}`, 'error');
+    }
+    setStatsLoading(false);
+  };
+
+  // One slice per Gedung (A–L, plus "Belum Ditentukan" for rooms with no Gedung set):
+  // sums each room's cover photo (if any) + gallery photo count into its building's total.
+  const pictureSlices = useMemo(() => {
+    const grouped: Record<string, number> = {};
+    rooms.forEach((room: any) => {
+      const cover = room.image_url ? 1 : 0;
+      const gallery = galleryCounts[room.id] || 0;
+      const total = cover + gallery;
+      if (total === 0) return;
+      const label = room.location || 'Belum Ditentukan';
+      grouped[label] = (grouped[label] || 0) + total;
+    });
+
+    const gedungOrder = GEDUNG_OPTIONS.map(g => `Gedung ${g}`);
+    const raw = Object.entries(grouped)
+      .sort(([a], [b]) => {
+        const ia = gedungOrder.indexOf(a);
+        const ib = gedungOrder.indexOf(b);
+        if (ia === -1 && ib === -1) return a.localeCompare(b);
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      })
+      .map(([label, value], i) => ({ label, value, color: PIE_COLORS[i % PIE_COLORS.length] }));
+
+    const total = raw.reduce((s, d) => s + d.value, 0);
+    let cumulative = 0;
+    return raw.map(d => {
+      const startAngle = total > 0 ? (cumulative / total) * 2 * Math.PI : 0;
+      cumulative += d.value;
+      const endAngle = total > 0 ? (cumulative / total) * 2 * Math.PI : 0;
+      return { ...d, startAngle, endAngle, percent: total > 0 ? (d.value / total) * 100 : 0 };
+    });
+  }, [rooms, galleryCounts]);
+
+  const totalPictures = pictureSlices.reduce((s, d) => s + d.value, 0);
 
   // ── ROOM DETAILS: fetch / add / edit / delete ──
   const fetchRooms = async () => {
@@ -341,6 +442,64 @@ export default function Detail({ showToast }: DetailProps) {
     }
   };
 
+  // ── "DATA" VIEW: pie chart of how many pictures exist per room ──
+  if (view === 'data') {
+    return (
+      <>
+        <div className="stats-row">
+          <div className="stat-card" style={{ gridColumn: '1 / -1' }}>
+            <div className="stat-num">{totalPictures}</div>
+            <div className="stat-label">Total Foto di Database</div>
+          </div>
+        </div>
+
+        <div className="section-title">Data Foto</div>
+        <div className="section-sub">DISTRIBUSI FOTO PER GEDUNG (COVER + GALERI)</div>
+
+        <div className="info-box">
+          Pie chart ini menjumlahkan foto cover dan foto galeri dari semua Detail Ruangan, dikelompokkan berdasarkan Gedung.
+        </div>
+
+        <div className="card">
+          <div className="card-title">
+            <span>// Distribusi Foto per Gedung</span>
+            <button
+              className="btn btn-secondary"
+              onClick={fetchPictureCounts}
+              disabled={statsLoading}
+              style={{ padding: '0.3rem 0.7rem', fontSize: '0.68rem' }}
+            >
+              {statsLoading ? 'Memuat...' : '↻ Refresh'}
+            </button>
+          </div>
+
+          {pictureSlices.length === 0
+            ? <div className="empty-state">Belum ada foto tersimpan di database.</div>
+            : <div className="pie-chart-wrap">
+              <svg viewBox="0 0 200 200" width="220" height="220">
+                {pictureSlices.map((s, i) => (
+                  <path key={i} d={arcPath(100, 100, 90, s.startAngle, s.endAngle)} fill={s.color} stroke="#0a1420" strokeWidth={1} />
+                ))}
+                <circle cx="100" cy="100" r="52" fill="#0d1b2e" />
+                <text x="100" y="96" textAnchor="middle" fontSize="22" fill="#00b8ff" fontFamily="'Playfair Display', serif" fontWeight={700}>{totalPictures}</text>
+                <text x="100" y="114" textAnchor="middle" fontSize="8" fill="#0095e8" letterSpacing="1">FOTO</text>
+              </svg>
+
+              <div className="pie-legend">
+                {pictureSlices.map((s, i) => (
+                  <div key={i} className="pie-legend-item">
+                    <span className="pie-swatch" style={{ background: s.color }} />
+                    <span className="pie-legend-label">{s.label}</span>
+                    <span className="pie-legend-value">{s.value} ({s.percent.toFixed(1)}%)</span>
+                  </div>
+                ))}
+              </div>
+            </div>}
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       {/* Stats */}
@@ -371,8 +530,13 @@ export default function Detail({ showToast }: DetailProps) {
 
         <div className="form-row">
           <div className="form-group">
-            <label className="form-label">Lokasi (opsional)</label>
-            <input className="form-input" placeholder="misalnya Lantai 2, Gedung A" value={roomLocation} onChange={e => setRoomLocation(e.target.value)} />
+            <label className="form-label">Lokasi (Gedung)</label>
+            <select className="form-input" value={roomLocation} onChange={e => setRoomLocation(e.target.value)}>
+              <option value="">Belum dipilih</option>
+              {GEDUNG_OPTIONS.map(g => (
+                <option key={g} value={`Gedung ${g}`}>{`Gedung ${g}`}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label className="form-label">Kapasitas (opsional)</label>
