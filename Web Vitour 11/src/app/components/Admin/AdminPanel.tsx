@@ -332,6 +332,65 @@ export default function AdminPanel() {
         .nav-btn:hover { background: var(--accent-soft); color: var(--accent); }
         .nav-btn.active { background: var(--accent); color: var(--accent-contrast); border-left: 2px solid var(--accent-dark); }
 
+        .sidebar {
+          background: var(--bg-panel);
+          border-right: 1px solid var(--border-color);
+          padding: 1.5rem 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .sidebar-divider {
+          border: none;
+          border-top: 1px solid var(--border-color);
+          margin: 1.25rem 0.25rem;
+        }
+
+        .sidebar-label {
+          font-size: 0.65rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          padding: 0.5rem 0.75rem;
+          margin-top: 0.5rem;
+        }
+
+        .nav-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1rem;
+          border-radius: 8px;
+          border: none;
+          background: transparent;
+          color: var(--text-body);
+          font-family: 'DM Mono', monospace;
+          font-size: 0.85rem;
+          cursor: pointer;
+          transition: background 0.2s ease, color 0.2s ease !important;
+          text-align: left;
+          width: 100%;
+        }
+
+        .nav-btn:hover {
+          background: var(--accent-soft);
+          color: var(--accent);
+        }
+
+        .nav-btn.active {
+          background: var(--accent);
+          color: var(--accent-contrast);
+          border-left: 2px solid var(--accent-dark);
+        }
+
+        /* Prevent theme-change animation in sidebar */
+        .sidebar,
+        .sidebar-label,
+        .sidebar-divider {
+          transition: none !important;
+        }
+          
         .content { padding: 1.5rem; overflow-y: auto; background: var(--bg-page); }
 
         .section-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
