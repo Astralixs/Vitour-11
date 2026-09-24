@@ -8,7 +8,19 @@ interface DetailProps {
 }
 
 const GEDUNG_OPTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
-const PIE_COLORS = ['#00b8ff', '#9d7fd4', '#c4a840', '#5dd0ff', '#4a6a9e', '#0095e8', '#7098c4', '#a0e0ff', '#0077cc', '#c47070'];
+const PIE_COLORS = ['#1565C0', '#5E35B1', '#D81B60', '#EF6C00', '#F9A825', '#6D4CE6', '#AD1457', '#C2185B', '#E65100', '#F57F17'];
+
+// Small reusable "hover for info" icon — replaces the old always-visible info box.
+function InfoTip({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="info-icon-wrap">
+      <span className="info-icon" tabIndex={0} aria-label="Info">
+        i
+        <span className="info-tooltip">{children}</span>
+      </span>
+    </div>
+  );
+}
 
 function polarToCartesian(cx: number, cy: number, r: number, angle: number) {
   return { x: cx + r * Math.sin(angle), y: cy - r * Math.cos(angle) };
@@ -454,11 +466,11 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
         </div>
 
         <div className="section-title">Data Foto</div>
-        <div className="section-sub">DISTRIBUSI FOTO PER GEDUNG (COVER + GALERI)</div>
+        <div className="section-sub">DISTRIBUSI FOTO PER GEDUNG</div>
 
-        <div className="info-box">
+        <InfoTip>
           Pie chart ini menjumlahkan foto cover dan foto galeri dari semua Detail Ruangan, dikelompokkan berdasarkan Gedung.
-        </div>
+        </InfoTip>
 
         <div className="card">
           <div className="card-title">
@@ -478,11 +490,11 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
             : <div className="pie-chart-wrap">
               <svg viewBox="0 0 200 200" width="220" height="220">
                 {pictureSlices.map((s, i) => (
-                  <path key={i} d={arcPath(100, 100, 90, s.startAngle, s.endAngle)} fill={s.color} stroke="#0a1420" strokeWidth={1} />
+                  <path key={i} d={arcPath(100, 100, 90, s.startAngle, s.endAngle)} fill={s.color} stroke="var(--bg-card)" strokeWidth={1} />
                 ))}
-                <circle cx="100" cy="100" r="52" fill="#0d1b2e" />
-                <text x="100" y="96" textAnchor="middle" fontSize="22" fill="#00b8ff" fontFamily="'Playfair Display', serif" fontWeight={700}>{totalPictures}</text>
-                <text x="100" y="114" textAnchor="middle" fontSize="8" fill="#0095e8" letterSpacing="1">FOTO</text>
+                <circle cx="100" cy="100" r="52" fill="var(--accent-soft)" />
+                <text x="100" y="96" textAnchor="middle" fontSize="22" fill="var(--accent)" fontFamily="'Playfair Display', serif" fontWeight={700}>{totalPictures}</text>
+                <text x="100" y="114" textAnchor="middle" fontSize="8" fill="var(--accent)" letterSpacing="1">FOTO</text>
               </svg>
 
               <div className="pie-legend">
@@ -511,11 +523,11 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
       </div>
 
       <div className="section-title">Detail Ruangan</div>
-      <div className="section-sub">FOTO + TEKS MANUAL UNTUK HALAMAN PUBLIK "DETAIL RUANGAN"</div>
+      <div className="section-sub">DATA UNTUK HALAMAN PUBLIK "DETAIL RUANGAN"</div>
 
-      <div className="info-box">
+      <InfoTip>
         Upload foto dan isi info di bawah. Ini akan tampil di halaman detail ruangan yang dilihat pengunjung saat mereka tap area di denah.
-      </div>
+      </InfoTip>
 
       {/* ── Add / Edit room form (photos picked below, before confirming) ── */}
       <div className="card">
@@ -575,7 +587,7 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
               <strong>Pilih gambar</strong> atau tap di sini — bisa pilih beberapa sekaligus
             </div>
           </div>
-          <span style={{ fontSize: '0.68rem', color: '#0095e8' }}>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
             Foto diupload saat kamu tekan Simpan/Tambah di bawah. Selama belum ditekan, foto masih bisa ditambah atau dibatalkan lewat preview di bawah ini. Kalau totalnya lebih dari 1 foto, halaman publik otomatis menampilkan carousel.
           </span>
         </div>
@@ -584,27 +596,27 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
         {roomPreviewSlides.length > 0 && (
           <div className="form-group" style={{ marginBottom: '1rem' }}>
             <label className="form-label">Preview Carousel (tampilan di Detail Ruangan)</label>
-            <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', border: '1px solid #0077cc', background: '#0a1420' }}>
+            <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-strong)', background: 'var(--bg-panel)' }}>
               <img
                 src={roomPreviewSlides[previewSlideIndex]?.url}
                 alt={roomPreviewSlides[previewSlideIndex]?.label}
-                style={{ width: '100%', height: 'clamp(260px, 45vw, 460px)', objectFit: 'contain', display: 'block', background: '#000' }}
+                style={{ width: '100%', height: 'clamp(260px, 45vw, 460px)', objectFit: 'contain', display: 'block', background: 'var(--bg-surface)' }}
               />
               {roomPreviewSlides.length > 1 && (
                 <>
                   <button
                     type="button"
                     onClick={() => setPreviewSlideIndex(i => (i - 1 + roomPreviewSlides.length) % roomPreviewSlides.length)}
-                    style={{ position: 'absolute', top: '50%', left: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(10,10,15,0.7)', color: '#00b8ff', border: '1px solid #0077cc', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
+                    style={{ position: 'absolute', top: '50%', left: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(20,20,25,0.65)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
                   >‹</button>
                   <button
                     type="button"
                     onClick={() => setPreviewSlideIndex(i => (i + 1) % roomPreviewSlides.length)}
-                    style={{ position: 'absolute', top: '50%', right: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(10,10,15,0.7)', color: '#00b8ff', border: '1px solid #0077cc', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
+                    style={{ position: 'absolute', top: '50%', right: '0.5rem', transform: 'translateY(-50%)', background: 'rgba(20,20,25,0.65)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
                   >›</button>
                 </>
               )}
-              <div style={{ position: 'absolute', bottom: '0.6rem', left: '0.6rem', background: 'rgba(10,10,15,0.75)', color: '#a0e0ff', fontSize: '0.68rem', padding: '0.25rem 0.6rem', borderRadius: '4px', letterSpacing: '0.05em' }}>
+              <div style={{ position: 'absolute', bottom: '0.6rem', left: '0.6rem', background: 'rgba(20,20,25,0.7)', color: '#FFFFFF', fontSize: '0.68rem', padding: '0.25rem 0.6rem', borderRadius: '4px', letterSpacing: '0.05em' }}>
                 {roomPreviewSlides[previewSlideIndex]?.label} · {previewSlideIndex + 1}/{roomPreviewSlides.length}
               </div>
             </div>
@@ -617,7 +629,7 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
                     type="button"
                     onClick={() => setPreviewSlideIndex(i)}
                     aria-label={`Slide ${i + 1}`}
-                    style={{ width: '9px', height: '9px', padding: 0, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === previewSlideIndex ? '#00b8ff' : '#0077cc' }}
+                    style={{ width: '9px', height: '9px', padding: 0, borderRadius: '50%', border: 'none', cursor: 'pointer', background: i === previewSlideIndex ? 'var(--accent)' : 'var(--border-strong)' }}
                   />
                 ))}
               </div>
@@ -659,7 +671,7 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
             {rooms.map((room: any) => (
               <div key={room.id} className={`room-card ${editingRoomId === room.id ? 'editing' : ''}`}>
                 <img className="room-img" src={room.image_url} alt={room.name}
-                  onError={(e: any) => { e.target.src = ''; e.target.style.background = '#0077cc'; }} />
+                  onError={(e: any) => { e.target.src = ''; e.target.style.background = 'var(--bg-surface)'; }} />
                 <div className="room-info">
                   <div className="room-name">{room.name}</div>
                   <div className="room-meta">
@@ -667,7 +679,7 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
                   </div>
                   {room.description && <div className="room-desc">{room.description}</div>}
                   <div className="room-actions">
-                    <span style={{ fontSize: '0.62rem', color: '#0095e8' }}>ID: {room.id}</span>
+                    <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>ID: {room.id}</span>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
                       <button className="btn btn-edit" onClick={() => handleEditRoomClick(room)}>Edit</button>
                       <button className="btn btn-danger" onClick={() => handleDeleteRoom(room.id)}>Hapus</button>
@@ -683,9 +695,9 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
       <div className="section-title" style={{ marginTop: '2rem', fontSize: '1.3rem' }}>Peta Denah Ruangan</div>
       <div className="section-sub">TENTUKAN AREA MANA YANG BISA DIKLIK PENGUNJUNG DI DENAH</div>
 
-      <div className="info-box">
+      <InfoTip>
         Tap posisi ruangan di denah untuk menandai area, kasih label, lalu (opsional) hubungkan ke salah satu Detail Ruangan di atas. Kalau belum dihubungkan ke ruangan manapun, pengunjung akan lihat pesan "belum tersedia" saat nge-tap area itu.
-      </div>
+      </InfoTip>
 
       <div className="card">
         <div className="card-title">
@@ -783,10 +795,10 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
                       <span className={`hotspot-badge ${linkedRoom ? 'linked' : 'unlinked'}`}>
                         {linkedRoom ? 'TERHUBUNG' : 'BELUM TERHUBUNG'}
                       </span>
-                      <span style={{ color: '#a0e0ff', fontSize: '0.8rem' }}>{pin.label}</span>
+                      <span style={{ color: 'var(--text-body)', fontSize: '0.8rem' }}>{pin.label}</span>
                     </div>
-                    <span style={{ color: '#0095e8', fontSize: '0.68rem' }}>x: {pin.map_x}% | y: {pin.map_y}%</span>
-                    {linkedRoom && <span style={{ color: '#0095e8', fontSize: '0.68rem' }}>menuju {linkedRoom.name}</span>}
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>x: {pin.map_x}% | y: {pin.map_y}%</span>
+                    {linkedRoom && <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>menuju {linkedRoom.name}</span>}
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                     <button className="btn btn-edit" onClick={() => handleEditPinClick(pin)}>Edit</button>

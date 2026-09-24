@@ -4,6 +4,18 @@ import { supabase } from '../../../services/supabase';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
+// Small reusable "hover for info" icon — replaces the old always-visible info box.
+function InfoTip({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="info-icon-wrap">
+      <span className="info-icon" tabIndex={0} aria-label="Info">
+        i
+        <span className="info-tooltip">{children}</span>
+      </span>
+    </div>
+  );
+}
+
 function clickToEquirectangular(
   clickX: number,
   clickY: number,
@@ -308,7 +320,7 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
 
       {!locationId && (
         <div className="card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-          <p style={{ color: '#0095e8', marginBottom: '1rem', fontSize: '0.82rem' }}>Belum ada lokasi. Buat lokasi dulu untuk mulai menambahkan panorama.</p>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.82rem' }}>Belum ada lokasi. Buat lokasi dulu untuk mulai menambahkan panorama.</p>
           <button className="btn btn-primary" onClick={createDefaultLocation}>+ Buat Lokasi</button>
         </div>
       )}
@@ -319,9 +331,9 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
           <div className="section-title">Panorama</div>
           <div className="section-sub">KELOLA SCENE 360°</div>
 
-          <div className="info-box">
-            Upload gambar equirectangular 360° kamu di sini. Klik <strong style={{ color: '#c4a840' }}>☆ Jadikan Pertama</strong> pada scene tempat tur harus dimulai. Klik kartu panorama untuk menambahkan hotspot ke situ.
-          </div>
+          <InfoTip>
+            Upload gambar equirectangular 360° kamu di sini. Klik <strong>☆ Jadikan Pertama</strong> pada scene tempat tur harus dimulai. Klik kartu panorama untuk menambahkan hotspot ke situ.
+          </InfoTip>
 
           <div className="card">
             <div className="card-title">// Upload Panorama Baru</div>
@@ -360,7 +372,7 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
                   <div key={pan.id} className={`panorama-card ${selectedPanorama?.id === pan.id ? 'selected' : ''}`}
                     onClick={() => { setSelectedPanorama(pan); onRequestHotspotView(); }}>
                     <img className="panorama-img" src={pan.image_url} alt={pan.title}
-                      onError={(e: any) => { e.target.src = ''; e.target.style.background = '#0077cc'; }} />
+                      onError={(e: any) => { e.target.src = ''; e.target.style.background = 'var(--bg-surface)'; }} />
                     <div className="panorama-info">
                       <span className="panorama-title">{pan.title || 'Tanpa judul'}</span>
                       <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -372,7 +384,7 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
                         <button className="btn btn-danger" onClick={e => { e.stopPropagation(); handleDeletePanorama(pan.id); }}>Hapus</button>
                       </div>
                     </div>
-                    <div style={{ padding: '0 0.75rem 0.5rem', fontSize: '0.62rem', color: '#0095e8' }}>ID: {pan.id}</div>
+                    <div style={{ padding: '0 0.75rem 0.5rem', fontSize: '0.62rem', color: 'var(--text-muted)' }}>ID: {pan.id}</div>
                   </div>
                 ))}
               </div>}
@@ -429,9 +441,9 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
 
               <div className="card">
                 <div className="card-title">// Langkah 2 — Atur dan simpan hotspot</div>
-                <div className="info-box">
+                <InfoTip>
                   Untuk tipe <strong>scene</strong>, pilih panorama tujuan dari dropdown. Untuk tipe <strong>info</strong>, cukup tambahkan teks label.
-                </div>
+                </InfoTip>
 
                 <div className="form-row" style={{ marginBottom: '0.5rem' }}>
                   <div className="form-group">
@@ -475,10 +487,10 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
                         <div className="hotspot-item-info">
                           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                             <span className={`hotspot-badge ${hs.type}`}>{hs.type.toUpperCase()}</span>
-                            <span style={{ color: '#a0e0ff', fontSize: '0.8rem' }}>{hs.text || '(tanpa label)'}</span>
+                            <span style={{ color: 'var(--text-body)', fontSize: '0.8rem' }}>{hs.text || '(tanpa label)'}</span>
                           </div>
-                          <span style={{ color: '#0095e8', fontSize: '0.68rem' }}>pitch: {hs.pitch} | yaw: {hs.yaw}</span>
-                          {hs.type === 'scene' && <span style={{ color: '#0095e8', fontSize: '0.68rem' }}>menuju Panorama ID: {hs.target_panorama_id}</span>}
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>pitch: {hs.pitch} | yaw: {hs.yaw}</span>
+                          {hs.type === 'scene' && <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>menuju Panorama ID: {hs.target_panorama_id}</span>}
                         </div>
                         <button className="btn btn-danger" onClick={() => handleDeleteHotspot(hs.id)}>Hapus</button>
                       </div>
