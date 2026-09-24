@@ -368,7 +368,7 @@ export default function AdminPanel() {
           font-family: 'DM Mono', monospace;
           font-size: 0.85rem;
           cursor: pointer;
-          transition: background 0.2s ease, color 0.2s ease !important;
+          transition: none;
           text-align: left;
           width: 100%;
         }
@@ -382,13 +382,6 @@ export default function AdminPanel() {
           background: var(--accent);
           color: var(--accent-contrast);
           border-left: 2px solid var(--accent-dark);
-        }
-
-        /* Prevent theme-change animation in sidebar */
-        .sidebar,
-        .sidebar-label,
-        .sidebar-divider {
-          transition: none !important;
         }
           
         .content { padding: 1.5rem; overflow-y: auto; background: var(--bg-page); }
@@ -614,7 +607,6 @@ export default function AdminPanel() {
           className="theme-toggle-btn"
           onClick={toggleTheme}
           aria-label="Ganti tema terang/gelap"
-          title={theme === 'dark' ? 'Beralih ke mode terang' : 'Beralih ke mode gelap'}
         >
           {/* Moon */}
           <span className="theme-icon theme-icon-moon">
