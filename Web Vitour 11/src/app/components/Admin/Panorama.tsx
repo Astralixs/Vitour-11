@@ -79,6 +79,8 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
   const [hsTargetId, setHsTargetId] = useState('');
   const [loading, setLoading] = useState(false);
   const [clickMarker, setClickMarker] = useState<{ x: number; y: number } | null>(null);
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizeProgress, setOptimizeProgress] = useState('');
 
   const imageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +212,89 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
       showToast(`Gagal mengupload panorama: ${err.message || err}`, 'error');
     }
     setLoading(false);
+  };
+
+  // One-time tool: re-uploads panoramas that were uploaded before the optimization
+  // (shrunk + WebP + 1-year cache) and points the database at the new file.
+  // The old file is only deleted after the database is confirmed to use the new one.
+  const handleOptimizeOldPanoramas = async () => {
+    if (!locationId) return;
+    const targets = panoramas.filter(
+      (p: any) => p.image_url && !p.image_url.toLowerCase().endsWith('.webp')
+    );
+    if (targets.length === 0) { showToast('Semua panorama sudah dioptimalkan!'); return; }
+    if (!window.confirm(`Optimalkan ${targets.length} panorama lama? Proses ini bisa memakan waktu beberapa menit, jangan tutup halaman.`)) return;
+
+    setOptimizing(true);
+    let done = 0;
+    try {
+      for (const pan of targets) {
+        setOptimizeProgress(`Memproses ${done + 1}/${targets.length}: ${pan.title || `ID ${pan.id}`}`);
+
+        // 1) Download the old file
+        const res = await fetch(pan.image_url);
+        if (!res.ok) throw new Error(`Gagal mengunduh gambar lama (ID ${pan.id}): ${res.status}`);
+        const blob = await res.blob();
+        const oldExt = pan.image_url.split('?')[0].split('.').pop() || 'jpg';
+        const original = new File([blob], `old.${oldExt}`, { type: blob.type });
+
+        // 2) Shrink + convert to WebP
+        const optimized = await compressImage(original, 4096, 0.85);
+
+        // 3) Upload under a NEW name with a 1-year cache
+        const newExt = optimized.name.split('.').pop();
+        const newName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${newExt}`;
+        const { error: upErr } = await supabase.storage
+          .from('panoramas')
+          .upload(newName, optimized, { contentType: optimized.type, cacheControl: '31536000' });
+        if (upErr) throw new Error(`Upload gagal (ID ${pan.id}): ${upErr.message}`);
+        const { data: { publicUrl } } = supabase.storage.from('panoramas').getPublicUrl(newName);
+
+        // 4) Point the database at the new file
+        const put = await fetch(`${BASE_URL}/api/panoramas/${pan.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...pan, image_url: publicUrl }),
+        });
+        if (!put.ok) {
+          await supabase.storage.from('panoramas').remove([newName]);
+          throw new Error(`Update database gagal (ID ${pan.id}): ${put.status} ${put.statusText}`);
+        }
+
+        // 5) Verify the database really saved the new URL before deleting anything
+        const fresh = await getPanoramas(locationId);
+        const saved = fresh.find((p: any) => p.id === pan.id);
+        if (saved?.image_url !== publicUrl) {
+          await supabase.storage.from('panoramas').remove([newName]);
+          throw new Error(
+            'Backend tidak menyimpan image_url yang baru. Endpoint PUT /api/panoramas/:id perlu diubah agar menerima image_url.'
+          );
+        }
+
+        // 6) Safe to delete the old file now
+        const marker = '/panoramas/';
+        const idx = pan.image_url.indexOf(marker);
+        if (idx !== -1) {
+          const oldPath = pan.image_url.substring(idx + marker.length);
+          const { error: rmErr } = await supabase.storage.from('panoramas').remove([oldPath]);
+          if (rmErr) console.error('[optimizeOld] could not remove old file:', rmErr);
+        }
+
+        console.log(
+          `[optimizeOld] ID ${pan.id}: ${(blob.size / 1024 / 1024).toFixed(2)} MB -> ${(optimized.size / 1024 / 1024).toFixed(2)} MB`
+        );
+        done++;
+      }
+      showToast(`${done} panorama berhasil dioptimalkan!`);
+    } catch (err: any) {
+      console.error('[handleOptimizeOldPanoramas] FULL ERROR:', err);
+      showToast(`Berhenti setelah ${done} panorama: ${err.message || err}`, 'error');
+    }
+
+    setOptimizing(false);
+    setOptimizeProgress('');
+    setSelectedPanorama(null); // its image_url may have changed
+    fetchPanoramas(locationId);
   };
 
   const handleDeletePanorama = async (id: number) => {
@@ -394,6 +479,18 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
               {loading ? 'Mengupload...' : 'Upload Panorama'}
             </button>
           </div>
+
+          {panoramas.some((p: any) => p.image_url && !p.image_url.toLowerCase().endsWith('.webp')) && (
+            <div className="card">
+              <div className="card-title">// Optimalkan Panorama Lama</div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.8rem' }}>
+                Beberapa panorama diupload sebelum optimasi. Tombol ini mengecilkan, mengubah ke WebP, dan mengaktifkan cache untuk semuanya. Hotspot tidak berubah.
+              </p>
+              <button className="btn btn-primary" onClick={handleOptimizeOldPanoramas} disabled={optimizing} style={{ width: '100%' }}>
+                {optimizing ? optimizeProgress || 'Memproses...' : 'Optimalkan Semua Panorama Lama'}
+              </button>
+            </div>
+          )}
 
           <div className="card">
             <div className="card-title">// Semua Panorama ({panoramas.length}) — tap kartu untuk mengedit hotspot</div>
