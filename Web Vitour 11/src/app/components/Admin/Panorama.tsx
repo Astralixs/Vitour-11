@@ -535,4 +535,4 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
       )}
     </>
   );
-}g
+}
