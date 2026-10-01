@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { MapPin, Phone, ShieldCheck, Compass, Clock, Search } from 'lucide-react';
+import { MapPin, Phone, Compass, Clock, Search } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useState, useEffect, useRef } from 'react';
 
@@ -38,12 +38,30 @@ export default function HomePage() {
   const locationMap = useReveal();
 
   useEffect(() => {
-    fetch(`${API_URL}/api/locations`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.length > 0) setLocationId(data[0].id);
-      });
-  }, []);
+  fetch(`${API_URL}/api/locations`)
+    .then(res => res.json())
+    .then(async data => {
+      if (data.length === 0) return;
+      const id = data[0].id;
+      setLocationId(id);
+
+      // Warm up: fetch the tour config and start downloading the first panorama
+      // while the visitor is still reading the home page.
+      try {
+        const res = await fetch(`${API_URL}/api/locations/${id}/tour`);
+        const cfg = await res.json();
+        const url = cfg?.scenes?.[cfg?.default?.firstScene]?.panorama;
+        if (url) {
+          const img = new Image();
+          img.crossOrigin = 'anonymous'; // must match what Pannellum uses, or the cache won't be reused
+          img.src = url;
+        }
+      } catch {
+        // preloading is optional, ignore failures
+      }
+    })
+    .catch(() => {});
+}, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -72,10 +90,16 @@ export default function HomePage() {
     return () => observers.forEach(obs => obs.disconnect());
   }, []);
 
-  const fadeUp = (visible: boolean, delay = 0) =>
-    `transition-all duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${delay ? `delay-[${delay}ms]` : ''} ${
+  // Delay is applied through an inline style (see delayStyle) because Tailwind
+  // can't pick up classes that are built at runtime.
+  const fadeUp = (visible: boolean) =>
+    `transition-all duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
       visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
     }`;
+
+  const delayStyle = (visible: boolean, delay = 0) => ({
+    transitionDelay: visible ? `${delay}ms` : '0ms',
+  });
 
   return (
     <div className="min-h-screen bg-white">
@@ -97,16 +121,16 @@ export default function HomePage() {
         .hero-btn    { animation: fadeSlideUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 1s both; }
         .hero-overlay { animation: fadeIn 1.8s ease-out 0s both; }
         .nav-anim    { animation: fadeSlideDown 1s cubic-bezier(0.16, 1, 0.3, 1) 0s both; }
-        .card-hover  {
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card-hover:hover {
-          transform: translateY(-6px);
-          box-shadow: 0 20px 40px rgba(0,79,167,0.15);
+
+        /* Hero fills the full screen height.
+           100vh is the fallback; 100dvh fixes mobile address-bar jumps. */
+        .hero-full {
+          height: 100vh;
+          height: 100dvh;
         }
       `}</style>
 
-      {/* Navigation Header (kept from original, now transparent/overlaying) */}
+      {/* Navigation Header */}
       <nav
         className={`nav-anim fixed top-0 left-0 w-full z-50 text-white px-4 md:px-8 py-3 md:py-4 transition-all duration-700 ease-in-out ${
           scrolled ? 'bg-black/30 backdrop-blur-md shadow-md' : 'bg-transparent backdrop-blur-0 shadow-none'
@@ -122,7 +146,10 @@ export default function HomePage() {
       </nav>
 
       {/* Hero Section */}
-      <section id="home" className="relative w-full h-[80vh] min-h-[480px] md:min-h-[600px] flex items-center overflow-hidden">
+      <section
+        id="home"
+        className="hero-full relative w-full min-h-[480px] md:min-h-[600px] flex items-center overflow-hidden"
+      >
         <div className="absolute inset-0 hero-overlay">
           <img
             src="/slide_2a.jpeg"
@@ -149,7 +176,7 @@ export default function HomePage() {
                   Mulai Tour Virtual
                 </Button>
               </Link>
-              <Link to="/Details"> 
+              <Link to="/Details">
                 <Button
                   size="default"
                   className="flex items-center gap-2 bg-[#0667d3] text-white hover:bg-[#004fa7] rounded-md text-sm md:text-base px-5 md:px-6 py-2.5 md:py-3 h-auto transition-transform duration-200 hover:scale-105 active:scale-95 w-full sm:w-auto"
@@ -166,7 +193,11 @@ export default function HomePage() {
       {/* Contact & Location Section */}
       <section id="location" className="py-12 md:py-20 px-4 md:px-16 bg-[#f0f3ff]">
         <div className="max-w-7xl mx-auto">
-          <div ref={locationReveal.ref} className={fadeUp(locationReveal.visible)}>
+          <div
+            ref={locationReveal.ref}
+            style={delayStyle(locationReveal.visible, 0)}
+            className={fadeUp(locationReveal.visible)}
+          >
             <h2 className="text-2xl md:text-4xl font-bold text-[#004fa7] mb-2">Hubungi Kami</h2>
             <p className="text-[#424753] text-sm md:text-base mb-8 md:mb-12">
               Kunjungi kampus kami atau hubungi kami melalui saluran di bawah ini.
@@ -175,7 +206,11 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-stretch">
             {/* Left Column: Info & Hours */}
-            <div ref={locationInfo.ref} className={`md:col-span-5 space-y-6 ${fadeUp(locationInfo.visible, 0)}`}>
+            <div
+              ref={locationInfo.ref}
+              style={delayStyle(locationInfo.visible, 0)}
+              className={`md:col-span-5 space-y-6 ${fadeUp(locationInfo.visible)}`}
+            >
               <div className="space-y-4">
                 <div className="flex items-start gap-3 md:gap-4 group">
                   <div className="bg-white p-2 md:p-3 rounded-lg border border-[#c2c6d5] group-hover:border-[#004fa7] transition-colors flex-shrink-0">
@@ -218,10 +253,11 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right Column: Live Map (kept from original) */}
+            {/* Right Column: Live Map */}
             <div
               ref={locationMap.ref}
-              className={`md:col-span-7 h-[300px] md:h-full min-h-[350px] md:min-h-[400px] rounded-xl overflow-hidden border border-[#c2c6d5] shadow-lg ${fadeUp(locationMap.visible, 250)}`}
+              style={delayStyle(locationMap.visible, 250)}
+              className={`md:col-span-7 h-[300px] md:h-full min-h-[350px] md:min-h-[400px] rounded-xl overflow-hidden border border-[#c2c6d5] shadow-lg ${fadeUp(locationMap.visible)}`}
             >
               <iframe
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3961.00062464909!2d107.55575517427145!3d-6.890527093108526!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e68e6bd6aaaaaab%3A0xf843088e2b5bf838!2sSMK%20Negeri%2011%20Bandung!5e0!3m2!1sen!2sid!4v1775716742394!5m2!1sen!2sid"

@@ -1,15 +1,19 @@
 
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Vitour 11</title>
-    </head>
+      <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Vitour 11</title>
 
-    <body>
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-    </body>
-  </html>
+        <!-- Fetch Pannellum in the background so the tour page opens faster -->
+        <link rel="prefetch" href="/pannellum.css" as="style" />
+        <link rel="prefetch" href="/pannellum.js" as="script" />
+      </head>
+
+      <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+      </body>
+    </html>
   

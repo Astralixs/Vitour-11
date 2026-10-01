@@ -11,6 +11,58 @@ declare global {
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// ── Load Pannellum (CSS + JS) only once for the whole session ──
+let pannellumPromise: Promise<void> | null = null;
+
+function loadPannellum(): Promise<void> {
+  if (window.pannellum) return Promise.resolve();
+  if (pannellumPromise) return pannellumPromise;
+
+  pannellumPromise = new Promise<void>((resolve, reject) => {
+    if (!document.querySelector('link[data-pannellum]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/pannellum.css';
+      link.setAttribute('data-pannellum', 'true');
+      document.head.appendChild(link);
+    }
+
+    const script = document.createElement('script');
+    script.src = '/pannellum.js';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => {
+      pannellumPromise = null; // allow retry
+      reject(new Error('Failed to load Pannellum library.'));
+    };
+    document.body.appendChild(script);
+  });
+
+  return pannellumPromise;
+}
+
+// ── Start downloading an image into the browser cache ──
+// crossOrigin must match what Pannellum uses, otherwise the cached copy may not be reused.
+const preloaded = new Set<string>();
+function preloadImage(url?: string) {
+  if (!url || preloaded.has(url)) return;
+  preloaded.add(url);
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.decoding = 'async';
+  img.src = url;
+}
+
+// Preload the panoramas that the given scene links to via hotspots.
+function preloadNeighbors(scenes: Record<string, any>, sceneId: string) {
+  const hotSpots = scenes[sceneId]?.hotSpots || [];
+  hotSpots.forEach((hs: any) => {
+    if (hs.type === 'scene' && hs.sceneId && scenes[hs.sceneId]) {
+      preloadImage(scenes[hs.sceneId].panorama);
+    }
+  });
+}
+
 export default function TourPage() {
   const panoramaRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null);
@@ -21,75 +73,89 @@ export default function TourPage() {
   const locationId = searchParams.get('location_id') || '1';
 
   useEffect(() => {
-    const loadingTimeout = setTimeout(() => setIsLoading(false), 8000);
+    let cancelled = false;
+    const controller = new AbortController();
 
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = '/pannellum.css';
-    document.head.appendChild(link);
+    setIsLoading(true);
+    setError(null);
 
-    const script = document.createElement('script');
-    script.src = '/pannellum.js';
-    script.async = true;
-
-    script.onload = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/locations/${locationId}/tour`);
-        const tourConfig = await res.json();
-
-        console.log('API_URL:', API_URL);
-        console.log('Tour config:', JSON.stringify(tourConfig, null, 2));
-
-        if (!tourConfig.scenes || Object.keys(tourConfig.scenes).length === 0) {
-          setError('No panoramas found for this location.');
-          setIsLoading(false);
-          clearTimeout(loadingTimeout);
-          return;
-        }
-
-        Object.entries(tourConfig.scenes).forEach(([sceneId, scene]: any) => {
-          console.log(`Scene "${sceneId}" panorama URL:`, scene.panorama);
-        });
-
-        if (panoramaRef.current && window.pannellum) {
-          viewerRef.current = window.pannellum.viewer(panoramaRef.current, {
-            default: {
-              firstScene: tourConfig.default.firstScene,
-              autoLoad: true,
-              showControls: true,
-              showFullscreenCtrl: true,
-              showZoomCtrl: true,
-              mouseZoom: true,
-              compass: false,
-              hotSpotDebug: false,
-            },
-            scenes: tourConfig.scenes,
-          });
-
-          clearTimeout(loadingTimeout);
-          setIsLoading(false);
-        }
-      } catch (err) {
-        console.error('Failed to load tour config:', err);
-        setError('Failed to load tour data. Make sure backend is running.');
-        clearTimeout(loadingTimeout);
-        setIsLoading(false);
-      }
-    };
-
-    script.onerror = () => {
-      setError('Failed to load Pannellum library.');
-      clearTimeout(loadingTimeout);
+    const fail = (msg: string) => {
+      if (cancelled) return;
+      setError(msg);
       setIsLoading(false);
     };
 
-    document.body.appendChild(script);
+    // 1) Fetch the tour config, and as soon as it arrives, start downloading the
+    //    first panorama (while Pannellum itself may still be loading).
+    const configPromise = fetch(`${API_URL}/api/locations/${locationId}/tour`, {
+      signal: controller.signal,
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`Tour request failed (${res.status})`);
+        return res.json();
+      })
+      .then(tourConfig => {
+        const firstId = tourConfig?.default?.firstScene;
+        preloadImage(tourConfig?.scenes?.[firstId]?.panorama);
+        return tourConfig;
+      });
+
+    // 2) Load the Pannellum library at the same time (not one after the other).
+    Promise.all([configPromise, loadPannellum()])
+      .then(([tourConfig]) => {
+        if (cancelled) return;
+
+        if (!tourConfig.scenes || Object.keys(tourConfig.scenes).length === 0) {
+          fail('No panoramas found for this location.');
+          return;
+        }
+        if (!panoramaRef.current || !window.pannellum) return;
+
+        const viewer = window.pannellum.viewer(panoramaRef.current, {
+          default: {
+            firstScene: tourConfig.default.firstScene,
+            autoLoad: true,
+            showControls: true,
+            showFullscreenCtrl: true,
+            showZoomCtrl: true,
+            mouseZoom: true,
+            compass: false,
+            hotSpotDebug: false,
+          },
+          scenes: tourConfig.scenes,
+        });
+        viewerRef.current = viewer;
+
+        // Hide the overlay only when the panorama is actually ready.
+        viewer.on('load', () => {
+          if (cancelled) return;
+          setIsLoading(false);
+          // Warm the cache for scenes the visitor is likely to open next.
+          preloadNeighbors(tourConfig.scenes, viewer.getScene());
+        });
+
+        viewer.on('error', (msg: string) => {
+          console.error('Pannellum error:', msg);
+          fail('Failed to load the panorama image.');
+        });
+      })
+      .catch((err: any) => {
+        if (err?.name === 'AbortError') return;
+        console.error('Failed to load tour:', err);
+        fail(
+          err?.message === 'Failed to load Pannellum library.'
+            ? err.message
+            : 'Failed to load tour data. Make sure backend is running.'
+        );
+      });
 
     return () => {
-      clearTimeout(loadingTimeout);
-      if (viewerRef.current) viewerRef.current.destroy();
-      if (script.parentNode) document.body.removeChild(script);
-      if (link.parentNode) document.head.removeChild(link);
+      cancelled = true;
+      controller.abort();
+      if (viewerRef.current) {
+        try { viewerRef.current.destroy(); } catch { /* already destroyed */ }
+        viewerRef.current = null;
+      }
     };
   }, [locationId]);
 
@@ -114,7 +180,7 @@ export default function TourPage() {
 
       {/* Panorama */}
       <section className="flex-1 bg-gray-900 relative min-h-0">
-        {isLoading && (
+        {isLoading && !error && (
           <div className="absolute inset-0 flex items-center justify-center text-white bg-gray-900 z-10">
             <div className="text-center px-4">
               <p className="text-lg md:text-xl mb-2">Memuat panorama...</p>

@@ -675,10 +675,6 @@ export default function AdminPanel() {
             Hotspot
           </button>
 
-          <div className="sidebar-label" style={{ marginTop: '2rem' }}>Panorama Terpilih</div>
-          {selectedPanoramaLabel
-            ? <div style={{ padding: '0.5rem 1rem', background: 'var(--accent)', borderRadius: '8px', fontSize: '0.78rem', color: 'var(--accent-contrast)' }}>{selectedPanoramaLabel}</div>
-            : <div style={{ padding: '0.5rem 1rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>Belum dipilih</div>}
 
           <hr className="sidebar-divider" />
 

@@ -16,6 +16,29 @@ function InfoTip({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Shrinks a panorama to a max width and converts it to WebP before upload.
+// Falls back to the original file if anything goes wrong or if it wouldn't get smaller.
+async function compressImage(file: File, maxWidth = 4096, quality = 0.85): Promise<File> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxWidth / bitmap.width);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+
+    const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/webp', quality));
+    if (!blob) return file;
+    if (scale === 1 && blob.size >= file.size) return file;
+
+    return new File([blob], file.name.replace(/\.\w+$/, '') + '.webp', { type: 'image/webp' });
+  } catch (err) {
+    console.warn('[compressImage] failed, uploading original:', err);
+    return file;
+  }
+}
+
 function clickToEquirectangular(
   clickX: number,
   clickY: number,
@@ -146,13 +169,22 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
     if (!locationId) { showToast('Lokasi tidak ditemukan — buat dulu', 'error'); return; }
     setLoading(true);
     try {
-      const fileExt = imageFile.name.split('.').pop();
+      // Shrink + convert to WebP first (much faster to load in the tour).
+      const optimized = await compressImage(imageFile, 4096, 0.85);
+      console.log(
+        `[handleAddPanorama] ${(imageFile.size / 1024 / 1024).toFixed(2)} MB -> ${(optimized.size / 1024 / 1024).toFixed(2)} MB`
+      );
+
+      const fileExt = optimized.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
 
       console.log('[handleAddPanorama] uploading to storage...', fileName);
       const { error: uploadError } = await supabase.storage
         .from('panoramas')
-        .upload(fileName, imageFile, { contentType: imageFile.type });
+        .upload(fileName, optimized, {
+          contentType: optimized.type,
+          cacheControl: '31536000', // cache for 1 year (file names are unique, so this is safe)
+        });
       if (uploadError) {
         console.error('[handleAddPanorama] storage upload error:', uploadError);
         throw new Error(`Storage upload failed: ${uploadError.message}`);
@@ -332,7 +364,7 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
           <div className="section-sub">KELOLA SCENE 360°</div>
 
           <InfoTip>
-            Upload gambar equirectangular 360° kamu di sini. Klik <strong>☆ Jadikan Pertama</strong> pada scene tempat tur harus dimulai. Klik kartu panorama untuk menambahkan hotspot ke situ.
+            Upload gambar equirectangular 360° kamu di sini. Gambar otomatis dikecilkan (maks 4096 px) dan diubah ke WebP supaya cepat dimuat. Klik <strong>☆ Jadikan Pertama</strong> pada scene tempat tur harus dimulai. Klik kartu panorama untuk menambahkan hotspot ke situ.
           </InfoTip>
 
           <div className="card">
@@ -372,6 +404,7 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
                   <div key={pan.id} className={`panorama-card ${selectedPanorama?.id === pan.id ? 'selected' : ''}`}
                     onClick={() => { setSelectedPanorama(pan); onRequestHotspotView(); }}>
                     <img className="panorama-img" src={pan.image_url} alt={pan.title}
+                      loading="lazy" decoding="async"
                       onError={(e: any) => { e.target.src = ''; e.target.style.background = 'var(--bg-surface)'; }} />
                     <div className="panorama-info">
                       <span className="panorama-title">{pan.title || 'Tanpa judul'}</span>
@@ -502,4 +535,4 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
       )}
     </>
   );
-}
+}g
