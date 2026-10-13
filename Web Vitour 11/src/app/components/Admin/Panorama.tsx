@@ -449,7 +449,7 @@ export default function Panorama({ view, showToast, onRequestHotspotView, onSele
           <div className="section-sub">KELOLA SCENE 360°</div>
 
           <InfoTip>
-            Upload gambar equirectangular 360° kamu di sini. Gambar otomatis dikecilkan (maks 4096 px) dan diubah ke WebP supaya cepat dimuat. Klik <strong>☆ Jadikan Pertama</strong> pada scene tempat tur harus dimulai. Klik kartu panorama untuk menambahkan hotspot ke situ.
+            Upload gambar panorama 360° kamu di sini. Gambar otomatis dikecilkan (maks 4096 px) dan diubah ke WebP agar cepat dimuat. Klik <strong>☆</strong> pada card untuk menentukan titk awal nya tour. Klik card panorama lalu edit hotspot di halaman hotspot dengan cara menekan poin titik navigasi.
           </InfoTip>
 
           <div className="card">

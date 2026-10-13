@@ -4,6 +4,7 @@ import TourPage from './components/User/TourPage';
 import Admin from './components/Admin/AdminPanel';
 import Details from './components/User/DetailRoom';
 import RoomMap from './components/User/RoomMap';
+import Signage from './components/User/Signage';
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
         <Route path="/tour" element={<TourPage />} />
         <Route path="/Details" element={<RoomMap />} />
         <Route path="/Details/:id" element={<Details />} />
+        <Route path="/signage" element={<Signage />} />
 
         {/* Admins */}
         <Route path="/Admin-Panels" element={<Admin />} />

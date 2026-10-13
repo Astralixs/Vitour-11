@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../../../services/supabase';
+import DenahCanvas, { FLOORS, type Floor } from './DenahCanvas';
 
 interface DetailProps {
   /** 'details' (default) shows the room/denah editor. 'data' shows the photo-count pie chart. */
@@ -73,11 +74,13 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
   const [pins, setPins] = useState<any[]>([]);
   const [pinLabel, setPinLabel] = useState('');
   const [pinRoomId, setPinRoomId] = useState('');
-  const [pinMarker, setPinMarker] = useState<{ x: number; y: number } | null>(null);
+  // Hitbox being drawn/edited: x,y = top-left corner, w,h = size, all in % of the shared canvas
+  const [pinRect, setPinRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [pinFloor, setPinFloor] = useState<Floor>('bawah');
+  const drawStartRef = useRef<{ x: number; y: number } | null>(null);
   const [pinLoading, setPinLoading] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
 
-  const mapImageRef = useRef<HTMLDivElement>(null);
 
   // ── PICTURE STATS (feeds the "Data" pie chart) ──
   const [galleryCounts, setGalleryCounts] = useState<Record<number, number>>({});
@@ -392,33 +395,82 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
     setEditingPinId(null);
     setPinLabel('');
     setPinRoomId('');
-    setPinMarker(null);
+    setPinRect(null);
+    drawStartRef.current = null;
   };
 
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  // ── Drawing a hitbox: press, drag, release (works with mouse, pen and touch) ──
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  const clamp100 = (n: number) => Math.min(100, Math.max(0, n));
+
+  const pointerToPercent = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setPinMarker({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
+    return {
+      x: clamp100(((e.clientX - rect.left) / rect.width) * 100),
+      y: clamp100(((e.clientY - rect.top) / rect.height) * 100),
+    };
+  };
+
+  const rectFromPoints = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+    x: round1(Math.min(a.x, b.x)),
+    y: round1(Math.min(a.y, b.y)),
+    w: round1(Math.abs(a.x - b.x)),
+    h: round1(Math.abs(a.y - b.y)),
+  });
+
+  const handleMapPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const start = pointerToPercent(e);
+    drawStartRef.current = start;
+    setPinRect({ x: round1(start.x), y: round1(start.y), w: 0, h: 0 });
+  };
+
+  const handleMapPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drawStartRef.current) return;
+    setPinRect(rectFromPoints(drawStartRef.current, pointerToPercent(e)));
+  };
+
+  const handleMapPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drawStartRef.current) return;
+    const r = rectFromPoints(drawStartRef.current, pointerToPercent(e));
+    drawStartRef.current = null;
+    // A plain tap (too small to be an area) just clears the box
+    setPinRect(r.w < 0.4 || r.h < 0.4 ? null : r);
+  };
+
+  // Fine-tune the box with the number inputs
+  const updateRectField = (key: 'x' | 'y' | 'w' | 'h', raw: string) => {
+    const v = Math.min(100, Math.max(0, Number(raw) || 0));
+    setPinRect(prev => ({ x: 0, y: 0, w: 0, h: 0, ...(prev || {}), [key]: v }));
   };
 
   const handleEditPinClick = (pin: any) => {
     setEditingPinId(pin.id);
     setPinLabel(pin.label || '');
     setPinRoomId(pin.room_id ? String(pin.room_id) : '');
-    setPinMarker({ x: pin.map_x, y: pin.map_y });
+    setPinFloor((pin.floor as Floor) || 'bawah');
+    setPinRect({
+      x: pin.map_x ?? 0,
+      y: pin.map_y ?? 0,
+      w: pin.map_w ?? 0,
+      h: pin.map_h ?? 0,
+    });
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   };
 
   const handleSavePin = async () => {
-    if (!pinMarker) { showToast('Tap posisi di denah dulu', 'error'); return; }
+    if (!pinRect || pinRect.w <= 0 || pinRect.h <= 0) { showToast('Gambar kotak area di denah dulu', 'error'); return; }
     if (!pinLabel.trim()) { showToast('Isi label/nama area', 'error'); return; }
 
     setPinLoading(true);
     try {
       const payload = {
         label: pinLabel,
-        map_x: pinMarker.x,
-        map_y: pinMarker.y,
+        map_x: pinRect.x,
+        map_y: pinRect.y,
+        map_w: pinRect.w,
+        map_h: pinRect.h,
+        floor: pinFloor,
         room_id: pinRoomId ? Number(pinRoomId) : null,
       };
 
@@ -696,50 +748,106 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
       <div className="section-sub">TENTUKAN AREA MANA YANG BISA DIKLIK PENGUNJUNG DI DENAH</div>
 
       <InfoTip>
-        Tap posisi ruangan di denah untuk menandai area, kasih label, lalu (opsional) hubungkan ke salah satu Detail Ruangan di atas. Kalau belum dihubungkan ke ruangan manapun, pengunjung akan lihat pesan "belum tersedia" saat nge-tap area itu.
+        Pilih lantai, lalu tekan dan geser di denah untuk menggambar kotak (hitbox) di atas ruangan. Kotak bisa dihaluskan lewat angka X/Y/Lebar/Tinggi. Setelah itu kasih label dan (opsional) hubungkan ke Detail Ruangan. Di halaman publik kotak ini transparan dan menyala saat disentuh. Kalau belum dihubungkan, pengunjung akan lihat pesan "belum tersedia".
       </InfoTip>
 
       <div className="card">
         <div className="card-title">
-          <span>{editingPinId ? `// Mengedit Area #${editingPinId}` : '// Langkah 1 — Tap posisi di denah'}</span>
+          <span>{editingPinId ? `// Mengedit Area #${editingPinId}` : '// Langkah 1 — Gambar kotak area di denah'}</span>
           {editingPinId && <span className="editing-badge">MENGEDIT</span>}
         </div>
-        <div className="click-image-wrapper" ref={mapImageRef} onClick={handleMapClick}>
-          <img src="/Denah.jpeg" alt="Denah SMK Negeri 11 Bandung" draggable={false}
-            onError={(e: any) => { e.target.style.display = 'none'; }} />
-          {!pinMarker && <div className="crosshair-label">Tap untuk menempatkan area</div>}
-
-          {/* Show already-saved pins for reference (skip the one currently being edited) */}
-          {pins.filter(p => p.id !== editingPinId).map((p: any) => (
-            <div key={p.id} className="existing-pin" style={{ left: `${p.map_x}%`, top: `${p.map_y}%` }}>
-              <div className="existing-pin-dot" />
-            </div>
+        {/* Floor switcher */}
+        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.8rem' }}>
+          {FLOORS.map(f => (
+            <button
+              key={f.key}
+              type="button"
+              className={`btn ${pinFloor === f.key ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setPinFloor(f.key)}
+            >
+              {f.label}
+            </button>
           ))}
-
-          {pinMarker && (
-            <div className="click-marker" style={{ left: `${pinMarker.x}%`, top: `${pinMarker.y}%` }}>
-              <div className="click-marker-ring"><div className="click-marker-dot" /></div>
-            </div>
-          )}
         </div>
 
-        <div className="coord-readout">
-          {!pinMarker ? (
-            <span className="coord-empty">Tap di denah untuk menentukan posisi area</span>
+        <DenahCanvas
+          floor={pinFloor}
+          className="rounded-lg border border-[var(--border-strong)]"
+          style={{ cursor: 'crosshair', touchAction: 'none', userSelect: 'none' }}
+          onPointerDown={handleMapPointerDown}
+          onPointerMove={handleMapPointerMove}
+          onPointerUp={handleMapPointerUp}
+          onPointerCancel={() => { drawStartRef.current = null; }}
+        >
+          {!pinRect && (
+            <div
+              style={{
+                position: 'absolute', top: '0.6rem', left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(20,20,25,0.7)', color: '#fff', fontSize: '0.7rem',
+                padding: '0.3rem 0.7rem', borderRadius: '999px', pointerEvents: 'none', whiteSpace: 'nowrap',
+              }}
+            >
+              Tekan &amp; geser untuk menggambar kotak area
+            </div>
+          )}
+
+          {/* Areas already saved on this floor (reference only; the one being edited is hidden) */}
+          {pins
+            .filter(p => p.id !== editingPinId && (p.floor || 'bawah') === pinFloor && p.map_w > 0 && p.map_h > 0)
+            .map((p: any) => (
+              <div
+                key={p.id}
+                title={p.label}
+                style={{
+                  position: 'absolute', pointerEvents: 'none',
+                  left: `${p.map_x}%`, top: `${p.map_y}%`, width: `${p.map_w}%`, height: `${p.map_h}%`,
+                  background: 'rgba(6,103,211,0.15)', border: '1px dashed rgba(6,103,211,0.7)', borderRadius: '3px',
+                }}
+              />
+            ))}
+
+          {/* The box being drawn / edited */}
+          {pinRect && (
+            <div
+              style={{
+                position: 'absolute', pointerEvents: 'none',
+                left: `${pinRect.x}%`, top: `${pinRect.y}%`, width: `${pinRect.w}%`, height: `${pinRect.h}%`,
+                background: 'rgba(255,170,0,0.28)', border: '2px solid #ff9f0a', borderRadius: '3px',
+                boxShadow: '0 0 12px 2px rgba(255,159,10,0.6)',
+              }}
+            />
+          )}
+        </DenahCanvas>
+
+        <div className="coord-readout" style={{ flexWrap: 'wrap', gap: '0.6rem' }}>
+          {!pinRect ? (
+            <span className="coord-empty">Tekan &amp; geser di denah untuk menggambar kotak area</span>
           ) : (
             <>
-              <div className="coord-pill">
-                <span className="coord-key">X</span>
-                <span className="coord-val">{pinMarker.x}%</span>
-              </div>
-              <div className="coord-divider" />
-              <div className="coord-pill">
-                <span className="coord-key">Y</span>
-                <span className="coord-val">{pinMarker.y}%</span>
-              </div>
+              {([
+                ['x', 'X'],
+                ['y', 'Y'],
+                ['w', 'Lebar'],
+                ['h', 'Tinggi'],
+              ] as const).map(([key, label]) => (
+                <label key={key} className="coord-pill" style={{ gap: '0.35rem' }}>
+                  <span className="coord-key">{label}</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    max={100}
+                    value={pinRect[key]}
+                    onChange={e => updateRectField(key, e.target.value)}
+                    className="form-input"
+                    style={{ width: '4.6rem', padding: '0.2rem 0.4rem', fontSize: '0.75rem' }}
+                  />
+                  <span className="coord-val">%</span>
+                </label>
+              ))}
               <div style={{ marginLeft: 'auto' }}>
                 <button className="btn btn-danger" style={{ padding: '0.25rem 0.65rem', fontSize: '0.7rem' }}
-                  onClick={() => setPinMarker(null)}>
+                  onClick={() => setPinRect(null)}>
                   Hapus
                 </button>
               </div>
@@ -770,12 +878,12 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
           <button
             className="btn btn-primary"
             onClick={handleSavePin}
-            disabled={pinLoading || !pinMarker || !pinLabel.trim()}
+            disabled={pinLoading || !pinRect || pinRect.w <= 0 || pinRect.h <= 0 || !pinLabel.trim()}
             style={{ flex: 1 }}
           >
             {pinLoading ? 'Menyimpan...' : editingPinId ? '✓ Simpan Area' : '+ Tambah Area'}
           </button>
-          {(editingPinId || pinMarker || pinLabel) && (
+          {(editingPinId || pinRect || pinLabel) && (
             <button className="btn btn-secondary" onClick={resetPinForm}>Batal</button>
           )}
         </div>
@@ -797,7 +905,12 @@ export default function Detail({ view = 'details', showToast }: DetailProps) {
                       </span>
                       <span style={{ color: 'var(--text-body)', fontSize: '0.8rem' }}>{pin.label}</span>
                     </div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>x: {pin.map_x}% | y: {pin.map_y}%</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>
+                      {pin.floor === 'atas' ? 'Lantai Atas' : 'Lantai Bawah'}
+                      {pin.map_w > 0 && pin.map_h > 0
+                        ? ` | x: ${pin.map_x}% y: ${pin.map_y}% | ${pin.map_w}% × ${pin.map_h}%`
+                        : ' | belum digambar (area lama berupa titik, gambar ulang kotaknya)'}
+                    </span>
                     {linkedRoom && <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>menuju {linkedRoom.name}</span>}
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
